@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Loader2, MessageCircle, Sparkles } from 'lucide-react';
 
-const API_BASE = window.location.origin;
+const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin;
 
 // Quick-ask chips the user can tap
 const QUICK_QUESTIONS = [

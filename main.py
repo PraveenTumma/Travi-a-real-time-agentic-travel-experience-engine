@@ -6,6 +6,7 @@ and real-time weather updates. Built for Google PromptWars hackathon.
 
 import json
 import logging
+import os
 from pathlib import Path
 from contextlib import asynccontextmanager
 
@@ -59,6 +60,12 @@ ALLOWED_ORIGINS = [
     "https://travi-cd6fa.web.app",    # Firebase Hosting
     "https://travi-cd6fa.firebaseapp.com",
 ]
+
+# Allow adding origins dynamically via environment variable
+extra_origins = os.getenv("ALLOWED_ORIGINS", "")
+if extra_origins:
+    ALLOWED_ORIGINS.extend([origin.strip() for origin in extra_origins.split(",") if origin.strip()])
+
 
 app.add_middleware(
     CORSMiddleware,

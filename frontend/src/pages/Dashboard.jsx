@@ -28,7 +28,7 @@ const DISRUPTION_OPTIONS = [
   "Traveler feeling unwell — lighter schedule needed",
 ];
 
-const API_BASE = window.location.origin;
+const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin;
 
 export default function Dashboard({ user }) {
   const [activeTab, setActiveTab] = useState('basics'); // basics, vibe, fun, needs
