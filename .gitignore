@@ -29,3 +29,5 @@ Thumbs.db
 
 # Prototype booking database
 data/
+
+.venv/

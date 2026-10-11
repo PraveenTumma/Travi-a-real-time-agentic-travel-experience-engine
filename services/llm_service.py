@@ -1,4 +1,4 @@
-"""LLM service supporting Groq and Gemini for itinerary generation."""
+"""LLM service supporting Anthropic and Gemini for itinerary generation (Groq disabled)."""
 
 import json
 import logging
@@ -110,19 +110,15 @@ async def generate_itinerary(
 
 Generate a complete day-by-day itinerary as JSON."""
 
-    return await _dispatch(user_prompt)
-
-
-async def _dispatch(user_prompt: str) -> dict[str, Any]:
-    """Route the prompt to the configured LLM provider."""
     provider = settings.llm_provider
     if provider == "anthropic":
         return await _call_anthropic(user_prompt)
-    if provider == "gemini":
+    elif provider == "gemini":
         return await _call_gemini(user_prompt)
-    if provider == "groq":
-        return await _call_groq(user_prompt)
-    raise ValueError("No LLM API key configured")
+    # elif provider == "groq":
+    #     return await _call_groq(user_prompt)
+    else:
+        raise ValueError("No LLM API key configured")
 
 
 async def generate_replan(
@@ -144,61 +140,79 @@ Re-generate the itinerary adapting to this disruption. Keep the same JSON format
 Adjust affected days, swap outdoor activities for indoor ones if weather is the issue,
 suggest alternative venues if a place is closed. Explain changes in weather_note fields."""
 
-    return await _dispatch(user_prompt)
+    provider = settings.llm_provider
+    if provider == "anthropic":
+        return await _call_anthropic(user_prompt)
+    elif provider == "gemini":
+        return await _call_gemini(user_prompt)
+    # elif provider == "groq":
+    #     return await _call_groq(user_prompt)
+    else:
+        raise ValueError("No LLM API key configured")
 
 
-async def _call_anthropic(user_prompt: str) -> dict[str, Any]:
-    """Call the Anthropic Messages API."""
+async def call_anthropic_text(
+    system: str, messages: list[dict[str, str]], max_tokens: int, timeout: float = 120.0
+) -> str:
+    """Call the Anthropic Messages API (or a compatible proxy) and return the reply text."""
+    url = f"{settings.anthropic_base_url}/v1/messages"
     headers = {
-        "x-api-key": settings.anthropic_api_key,
+        "Authorization": f"Bearer {settings.anthropic_auth_token}",
+        "x-api-key": settings.anthropic_auth_token,
         "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-    }
-    payload = {
-        "model": "claude-haiku-5-5",
-        "max_tokens": 8192,
-        "temperature": 0.7,
-        "system": SYSTEM_PROMPT,
-        "messages": [{"role": "user", "content": user_prompt}],
-    }
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            "https://api.anthropic.com/v1/messages", json=payload, headers=headers
-        )
-        response.raise_for_status()
-        content = response.json()["content"][0]["text"].strip()
-        logger.info("Anthropic response received (%d chars)", len(content))
-        if content.startswith("```"):
-            content = content.strip("`").removeprefix("json").strip()
-        return json.loads(content)
-
-
-async def _call_groq(user_prompt: str) -> dict[str, Any]:
-    """Call the Groq API (OpenAI-compatible endpoint)."""
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {settings.groq_api_key}",
         "Content-Type": "application/json",
     }
     payload = {
-        "model": "llama-3.1-8b-instant",
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        "temperature": 0.7,
-        "max_tokens": 4096,
-        "response_format": {"type": "json_object"},
+        "model": settings.anthropic_model,
+        "max_tokens": max_tokens,
+        "system": system,
+        "messages": messages,
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.post(url, json=payload, headers=headers)
         response.raise_for_status()
         data = response.json()
-        content = data["choices"][0]["message"]["content"]
-        logger.info("Groq response received (%d chars)", len(content))
-        return json.loads(content)
+        return "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+
+
+async def _call_anthropic(user_prompt: str) -> dict[str, Any]:
+    """Generate an itinerary via Anthropic and parse the JSON reply."""
+    content = await call_anthropic_text(
+        SYSTEM_PROMPT, [{"role": "user", "content": user_prompt}], max_tokens=8192
+    )
+    logger.info("Anthropic response received (%d chars)", len(content))
+    # Tolerate stray markdown fences or prose around the JSON object
+    start, end = content.find("{"), content.rfind("}")
+    return json.loads(content[start:end + 1] if start != -1 and end > start else content)
+
+
+# Groq disabled — Anthropic is the primary provider
+# async def _call_groq(user_prompt: str) -> dict[str, Any]:
+#     """Call the Groq API (OpenAI-compatible endpoint)."""
+#     url = "https://api.groq.com/openai/v1/chat/completions"
+#     headers = {
+#         "Authorization": f"Bearer {settings.groq_api_key}",
+#         "Content-Type": "application/json",
+#     }
+#     payload = {
+#         "model": "llama-3.1-8b-instant",
+#         "messages": [
+#             {"role": "system", "content": SYSTEM_PROMPT},
+#             {"role": "user", "content": user_prompt},
+#         ],
+#         "temperature": 0.7,
+#         "max_tokens": 4096,
+#         "response_format": {"type": "json_object"},
+#     }
+#
+#     async with httpx.AsyncClient(timeout=60.0) as client:
+#         response = await client.post(url, json=payload, headers=headers)
+#         response.raise_for_status()
+#         data = response.json()
+#         content = data["choices"][0]["message"]["content"]
+#         logger.info("Groq response received (%d chars)", len(content))
+#         return json.loads(content)
 
 
 async def _call_gemini(user_prompt: str) -> dict[str, Any]:

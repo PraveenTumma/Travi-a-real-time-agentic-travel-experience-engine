@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Bookmark, Trash2, Eye, Share2, Ticket } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Bookmark, Trash2, Eye, Share2, MessageCircle, Ticket } from 'lucide-react';
 import { saveTrip, subscribeToSavedTrips, deleteSavedTrip, subscribeToSharedTrips } from '../services/firestoreService';
+import { shareItineraryOnWhatsApp } from '../utils/whatsapp';
 import ItineraryMap from '../components/ItineraryMap';
 import TripChatbot from '../components/TripChatbot';
 import ShareTripModal from '../components/ShareTripModal';
@@ -551,6 +552,27 @@ export default function Dashboard({ user }) {
                         Share
                       </button>
                     )}
+                    <button
+                      onClick={() => shareItineraryOnWhatsApp(itinerary, destination)}
+                      aria-label="Share itinerary on WhatsApp"
+                      style={{
+                        padding: '0.4rem 0.75rem', borderRadius: '8px',
+                        border: '2px solid var(--ink-black)',
+                        background: '#25D366',
+                        color: 'white',
+                        fontFamily: 'Nunito, sans-serif', fontWeight: 'bold', fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        boxShadow: '2px 2px 0px var(--ink-black)',
+                        display: 'flex', alignItems: 'center', gap: '4px',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseOver={(e) => { e.currentTarget.style.transform = 'translate(-1px, -1px)'; e.currentTarget.style.boxShadow = '3px 3px 0px var(--ink-black)'; }}
+                      onMouseOut={(e) => { e.currentTarget.style.transform = 'translate(0)'; e.currentTarget.style.boxShadow = '2px 2px 0px var(--ink-black)'; }}
+                    >
+                      <MessageCircle size={14} />
+                      WhatsApp
+                    </button>
                   </div>
                   {/* Trip summary — full width */}
                   <h2 className="cartoon-font" style={{ margin: '0 0 0.5rem 0', fontSize: '2rem', color: 'var(--ink-black)' }}>

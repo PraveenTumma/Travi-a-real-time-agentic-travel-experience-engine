@@ -17,7 +17,8 @@ from fastapi.testclient import TestClient
 
 
 # Set a dummy key so config doesn't raise on import
-os.environ.setdefault("GROQ_API_KEY", "test-key")
+# os.environ.setdefault("GROQ_API_KEY", "test-key")  # Groq disabled
+os.environ.setdefault("ANTHROPIC_AUTH_TOKEN", "test-key")
 os.environ.setdefault("GOOGLE_MAPS_API_KEY", "test-maps-key")
 
 from main import app
