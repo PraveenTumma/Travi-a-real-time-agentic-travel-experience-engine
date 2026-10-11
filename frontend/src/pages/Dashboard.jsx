@@ -30,6 +30,19 @@ const DISRUPTION_OPTIONS = [
   "Traveler feeling unwell — lighter schedule needed",
 ];
 
+// FastAPI sends 422 `detail` as an array of objects; flatten any shape to readable text
+const formatApiError = (detail, fallback) => {
+  if (typeof detail === 'string' && detail) return detail;
+  if (Array.isArray(detail) && detail.length) {
+    return detail.map((d) => {
+      const field = Array.isArray(d?.loc) ? d.loc.filter((x) => x !== 'body').join(' → ') : '';
+      const msg = d?.msg || (typeof d === 'string' ? d : '');
+      return field ? `${field}: ${msg}` : msg;
+    }).filter(Boolean).join('; ') || fallback;
+  }
+  return fallback;
+};
+
 const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin;
 
 export default function Dashboard({ user }) {
@@ -155,7 +168,7 @@ export default function Dashboard({ user }) {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.detail || `Server error: ${res.status}`);
+        throw new Error(formatApiError(errData.detail, `Server error: ${res.status}`));
       }
       const data = await res.json();
       setItinerary(data);
@@ -223,8 +236,7 @@ export default function Dashboard({ user }) {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        const detail = typeof errData.detail === 'string' ? errData.detail : '';
-        throw new Error(detail || `Activity update failed: ${res.status}`);
+        throw new Error(formatApiError(errData.detail, `Activity update failed: ${res.status}`));
       }
       const data = await res.json();
       const next = data.activity || {};

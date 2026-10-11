@@ -269,13 +269,20 @@ async def _call_anthropic(
     user_prompt: str, system: str = SYSTEM_PROMPT, max_tokens: int = 8192
 ) -> dict[str, Any]:
     """Generate an itinerary via Anthropic and parse the JSON reply."""
-    content = await call_anthropic_text(
-        system, [{"role": "user", "content": user_prompt}], max_tokens=max_tokens
-    )
-    logger.info("Anthropic response received (%d chars)", len(content))
-    # Tolerate stray markdown fences or prose around the JSON object
-    start, end = content.find("{"), content.rfind("}")
-    return json.loads(content[start:end + 1] if start != -1 and end > start else content)
+    # Retry once: the model occasionally returns malformed or truncated JSON
+    for attempt in range(2):
+        content = await call_anthropic_text(
+            system, [{"role": "user", "content": user_prompt}], max_tokens=max_tokens
+        )
+        logger.info("Anthropic response received (%d chars)", len(content))
+        # Tolerate stray markdown fences or prose around the JSON object
+        start, end = content.find("{"), content.rfind("}")
+        try:
+            return json.loads(content[start:end + 1] if start != -1 and end > start else content)
+        except json.JSONDecodeError:
+            if attempt == 1:
+                raise
+            logger.warning("Malformed JSON from Anthropic, retrying once")
 
 
 # Groq disabled — Anthropic is the primary provider
