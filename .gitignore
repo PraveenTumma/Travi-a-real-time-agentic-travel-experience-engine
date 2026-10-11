@@ -26,3 +26,5 @@ Thumbs.db
 
 # WhatsApp images (not needed in repo)
 *.jpeg
+
+.venv/
