@@ -1,11 +1,13 @@
 {
   "member": "praveen",
-  "state": "idle",
+  "state": "working",
   "branch": "main",
   "editing": [],
   "unpushed": 0,
-  "last_seen": "2026-10-11T10:23:18.160Z",
-  "doing": "",
-  "doing_since": "2026-10-11T09:49:22.604Z",
-  "planned_files": []
+  "last_seen": "2026-10-11T10:23:32.053Z",
+  "doing": "Diagnosing Firebase config / login on Vercel",
+  "doing_since": "2026-10-11T10:23:32.053Z",
+  "planned_files": [
+    "frontend/src/firebase.js"
+  ]
 }
