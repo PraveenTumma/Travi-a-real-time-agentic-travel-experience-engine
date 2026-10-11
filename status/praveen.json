@@ -1,11 +1,22 @@
 {
   "member": "praveen",
-  "state": "idle",
+  "state": "working",
   "branch": "main",
   "editing": [],
   "unpushed": 0,
-  "last_seen": "2026-10-11T09:48:30.338Z",
-  "doing": "",
-  "doing_since": "2026-10-11T09:15:42.689Z",
-  "planned_files": []
+  "last_seen": "2026-10-11T09:49:22.601Z",
+  "doing": "Adding Origin field + world place suggestions (Trip Details, plan API, saved/shared trips, booking)",
+  "doing_since": "2026-10-11T09:49:22.604Z",
+  "planned_files": [
+    "frontend/src/pages/Dashboard.jsx",
+    "models.py",
+    "main.py",
+    "services/llm_service.py",
+    "services/orchestrator.py",
+    "services/booking_catalog.py",
+    "services/booking_service.py",
+    "booking_api.py",
+    "frontend/src/components/TicketBooking.jsx",
+    "frontend/src/services/firestoreService.js"
+  ]
 }
