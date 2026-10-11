@@ -1,11 +1,15 @@
 {
   "member": "sai",
-  "state": "idle",
+  "state": "working",
   "branch": "main",
   "editing": [],
   "unpushed": 0,
-  "last_seen": "2026-10-11T09:11:40.890Z",
-  "doing": "",
-  "doing_since": "2026-10-11T08:56:31.893Z",
-  "planned_files": []
+  "last_seen": "2026-10-11T09:12:58.244Z",
+  "doing": "Vercel same-origin backend (api/index.py, root vercel.json) + landing copy (no more Llama 3)",
+  "doing_since": "2026-10-11T09:12:58.244Z",
+  "planned_files": [
+    "api/index.py",
+    "vercel.json",
+    "frontend/src/pages/Landing.jsx"
+  ]
 }
