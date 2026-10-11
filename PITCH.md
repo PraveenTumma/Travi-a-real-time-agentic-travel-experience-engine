@@ -51,9 +51,12 @@ Pilot plan: 50 users from our network and college travel groups over 2 weeks. Tr
 - Every activity and meal **pinned on Google Maps**, day by day, in a swipeable card carousel.
 - **One-tap re-plan** for disruptions: rain, closure, flight delay, feeling unwell.
 - **Travi AI chat** that answers questions about your own itinerary (budget, rainy days, must-dos).
-- Save trips, add friends, share trips in-app with real-time notifications, and **share to WhatsApp**.
+- Save trips, add friends, share trips in-app with real-time notifications.
+- **WhatsApp share in one tap:** the green WhatsApp button on the itinerary header sends a formatted trip summary (day themes, and every activity for short trips) into WhatsApp. The user picks the group and hits send. No WhatsApp API or Meta approval needed.
 
 **Honest gaps / next 2 weeks**
+- WhatsApp share is a one-way text snapshot. It doesn't update when the plan changes, and friends can't edit it in Travi.
+- WhatsApp clicks aren't tracked yet. Firebase Analytics is initialised, but no custom events are logged, so the "shares per saved trip" metric needs a `logEvent` on the button.
 - Moving the AI to stronger models through RouterPlus (Claude / GPT) for better, more reliable plans (in progress today).
 - Re-plan that edits only the affected day and shows what changed.
 - Verifying places and coordinates against Google Places (today the AI suggests them).
@@ -78,6 +81,6 @@ Pilot plan: 50 users from our network and college travel groups over 2 weeks. Tr
 3. Walk the day cards. Show the **weather note** and the **map pins** for that day.
 4. Hit **"Heavy rain expected tomorrow"**. The plan moves indoors. *This is the hero moment.*
 5. Ask the chat: *"What's my total budget?"* or *"Which day is rainy?"*
-6. **Share to WhatsApp** or with a friend. Close: "Plan in a minute, Plan B in a second, and your whole group is in."
+6. Hit the green **WhatsApp** button. WhatsApp opens with the trip summary pre-filled. Pick the group and send, so the whole group sees the plan. Close: "Plan in a minute, Plan B in a second, and your whole group is in."
 
 **Before going on stage:** open the app 2–3 minutes early to wake the Render backend (it sleeps when idle). Pick dates within the next 16 days so weather shows. Keep one saved trip ready as a fallback in case the AI call is slow.
