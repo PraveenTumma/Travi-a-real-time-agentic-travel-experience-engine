@@ -1,6 +1,6 @@
 {
   "member": "praveen",
-  "state": "idle",
+  "state": "working",
   "branch": "main",
   "editing": [
     ".claude/commands/delegate.md",
@@ -22,5 +22,13 @@
     "services/llm_service.py"
   ],
   "unpushed": 2,
-  "last_seen": "2026-10-11T09:15:21.864Z"
+  "last_seen": "2026-10-11T09:15:42.686Z",
+  "doing": "Resolving merge of origin/main into main (ticket booking vs Anthropic provider switch)",
+  "doing_since": "2026-10-11T09:15:42.689Z",
+  "planned_files": [
+    ".gitignore",
+    "config.py",
+    "services/llm_service.py",
+    "frontend/src/pages/Dashboard.jsx"
+  ]
 }
