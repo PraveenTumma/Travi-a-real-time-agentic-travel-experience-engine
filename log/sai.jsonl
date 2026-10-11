@@ -12,3 +12,4 @@
 {"at":"2026-10-11T09:49:30.630Z","by":"sai","kind":"auto","text":"now working on: Adding per-activity edit (swap/lock/regenerate one item) — new POST /api/activity endpoint + Dashboard UI"}
 {"at":"2026-10-11T09:59:43.957Z","by":"sai","kind":"note","text":"LIVE: https://travi-ai.vercel.app (Sai's Vercel, frontend + /api backend). API waits on ANTHROPIC_* env vars. Shiv: please send Sai the RouterPlus key."}
 {"at":"2026-10-11T10:11:12.650Z","by":"sai","kind":"note","text":"New POST /api/activity (swap|regenerate one activity; returns {activity, mode}). /api/replan now accepts optional locked_activities: [\"Day N: name\"]. Activities carry optional locked flag. Dashboard.jsx activity cards got Lock/Swap/Regenerate buttons."}
+{"at":"2026-10-11T10:11:17.714Z","by":"sai","kind":"auto","text":"idle"}
