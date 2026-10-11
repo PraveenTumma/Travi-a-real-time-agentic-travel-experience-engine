@@ -1,0 +1,25 @@
+{
+  "members": [
+    {
+      "id": "sai",
+      "short": "Sai",
+      "name": "Sai Praneeth Boggula",
+      "github": "Rogue467",
+      "match": ["sai", "praneeth", "boggula", "rogue467"]
+    },
+    {
+      "id": "praveen",
+      "short": "Praveen",
+      "name": "Praveen Kumar",
+      "github": "PraveenTumma",
+      "match": ["praveen", "tumma", "praveentumma"]
+    },
+    {
+      "id": "shiv",
+      "short": "Shiv",
+      "name": "Shiv Kumar",
+      "github": "",
+      "match": ["shiv"]
+    }
+  ]
+}
