@@ -87,6 +87,7 @@ class TripOrchestrator:
         constraints: dict[str, Any],
         disruption: str,
         original_summary: str = "",
+        locked_activities: list[str] | None = None,
     ) -> dict[str, Any]:
         """Re-plan a trip based on a disruption event.
 
@@ -126,4 +127,4 @@ class TripOrchestrator:
             f"Original plan summary: {original_summary}"
         )
 
-        return await generate_replan(context, disruption, preferences)
+        return await generate_replan(context, disruption, preferences, locked_activities or [])

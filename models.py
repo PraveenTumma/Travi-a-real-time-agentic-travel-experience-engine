@@ -127,6 +127,70 @@ class ReplanRequest(BaseModel):
         max_length=5000,
         description="Summary of the original itinerary to adjust",
     )
+    locked_activities: list[str] = Field(
+        default_factory=list,
+        max_length=60,
+        description="Activities the traveler locked (\"Day 2: Senso-ji Temple\"); the re-plan must keep them",
+    )
+
+    @field_validator("locked_activities")
+    @classmethod
+    def validate_locked(cls, v: list[str]) -> list[str]:
+        """Trim and cap each locked-activity label."""
+        return [a.strip()[:150] for a in v if isinstance(a, str) and a.strip()]
+
+
+class ActivityEditRequest(BaseModel):
+    """Request model for editing a single itinerary activity in place."""
+
+    destination: str = Field(..., min_length=2, max_length=200)
+    date: str = Field(default="", max_length=20, description="Date of the day being edited")
+    day_theme: str = Field(default="", max_length=200)
+    weather_note: str = Field(default="", max_length=500)
+    mode: str = Field(
+        default="swap",
+        description="swap = a different activity for this slot; regenerate = same idea, fresh details",
+    )
+    instruction: str = Field(
+        default="",
+        max_length=300,
+        description="Optional free-text request, e.g. 'cheaper', 'earlier', 'kid-friendly'",
+    )
+    activity: dict = Field(..., description="The activity object currently in the slot")
+    other_activities: list[str] = Field(
+        default_factory=list,
+        max_length=20,
+        description="Names of the other activities that day, so the model avoids duplicates",
+    )
+    budget_level: str = Field(default="moderate")
+    preferences: list[str] = Field(default_factory=list, max_length=10)
+    traveler_type: str = Field(default="solo")
+    constraints: TripConstraints = Field(default_factory=TripConstraints)
+
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, v: str) -> str:
+        """Only two edit modes exist."""
+        allowed = {"swap", "regenerate"}
+        if v.lower() not in allowed:
+            raise ValueError(f"mode must be one of: {allowed}")
+        return v.lower()
+
+    @field_validator("activity")
+    @classmethod
+    def validate_activity(cls, v: dict) -> dict:
+        """The slot must at least have a name; cap the payload size."""
+        if not isinstance(v, dict) or not str(v.get("name", "")).strip():
+            raise ValueError("activity.name is required")
+        if len(str(v)) > 4000:
+            raise ValueError("activity payload too large")
+        return v
+
+    @field_validator("other_activities")
+    @classmethod
+    def validate_other(cls, v: list[str]) -> list[str]:
+        """Trim and cap sibling activity names."""
+        return [a.strip()[:150] for a in v if isinstance(a, str) and a.strip()]
 
 
 class Activity(BaseModel):

@@ -26,9 +26,9 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import settings
-from models import TripRequest, ReplanRequest, HealthResponse
+from models import TripRequest, ReplanRequest, ActivityEditRequest, HealthResponse
 from services.orchestrator import TripOrchestrator
-from services.llm_service import call_anthropic_text
+from services.llm_service import call_anthropic_text, generate_activity
 from security import RateLimiter, sanitize_input, SecurityHeadersMiddleware
 from booking_api import router as booking_router
 
@@ -170,12 +170,69 @@ async def replan_trip(request: Request, replan: ReplanRequest):
             constraints=replan.constraints.model_dump(),
             disruption=sanitize_input(replan.disruption),
             original_summary=sanitize_input(replan.original_itinerary_summary),
+            locked_activities=[sanitize_input(a) for a in replan.locked_activities],
         )
         return JSONResponse(content=result)
 
     except Exception as exc:
         logger.error("Re-planning failed: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to re-plan. Please try again.")
+
+
+ACTIVITY_DEFAULTS = {
+    "time": "", "name": "", "location": "", "description": "",
+    "category": "landmark", "estimated_cost_usd": 0, "duration_hours": 1.0, "indoor": False,
+}
+
+
+@app.post("/api/activity", tags=["Planning"])
+async def edit_activity(request: Request, edit: ActivityEditRequest):
+    """Swap or regenerate ONE activity in a day without re-planning the whole trip.
+
+    Returns a single activity object in the same shape the itinerary uses,
+    plus a short ``change_note`` explaining what changed.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    if not rate_limiter.is_allowed(client_ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded.")
+
+    current = edit.activity
+    safe_activity = {
+        **current,
+        "name": sanitize_input(str(current.get("name", ""))),
+        "description": sanitize_input(str(current.get("description", ""))),
+        "location": sanitize_input(str(current.get("location", ""))),
+    }
+
+    try:
+        result = await generate_activity(
+            destination=sanitize_input(edit.destination),
+            activity=safe_activity,
+            mode=edit.mode,
+            instruction=sanitize_input(edit.instruction),
+            other_activities=[sanitize_input(a) for a in edit.other_activities],
+            date=sanitize_input(edit.date),
+            day_theme=sanitize_input(edit.day_theme),
+            weather_note=sanitize_input(edit.weather_note),
+            budget_level=edit.budget_level,
+            preferences=[sanitize_input(p) for p in edit.preferences],
+            traveler_type=edit.traveler_type,
+            constraints=edit.constraints.model_dump(),
+        )
+    except Exception as exc:
+        logger.error("Activity edit failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to update that activity. Please try again.")
+
+    if not isinstance(result, dict) or not str(result.get("name", "")).strip():
+        logger.error("Activity edit returned no usable activity: %r", result)
+        raise HTTPException(status_code=500, detail="Failed to update that activity. Please try again.")
+
+    # Fill gaps from the old activity so the card never loses a field
+    activity = {**ACTIVITY_DEFAULTS, **{k: v for k, v in current.items() if k in ACTIVITY_DEFAULTS}, **result}
+    if edit.mode == "swap" and activity["name"].strip().lower() == str(current.get("name", "")).strip().lower():
+        activity.setdefault("change_note", "Could not find a different option; details refreshed instead.")
+    activity["locked"] = False
+    return JSONResponse(content={"activity": activity, "mode": edit.mode})
 
 
 @app.post("/api/chat", tags=["Chat"])

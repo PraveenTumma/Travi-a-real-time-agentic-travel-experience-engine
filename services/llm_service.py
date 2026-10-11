@@ -125,8 +125,15 @@ async def generate_replan(
     original_context: str,
     disruption: str,
     preferences: list[str],
+    locked_activities: list[str] | None = None,
 ) -> dict[str, Any]:
     """Re-plan an itinerary based on a disruption event."""
+    locked_block = ""
+    if locked_activities:
+        locked_block = (
+            "LOCKED ACTIVITIES (the traveler pinned these; keep each one on its day, "
+            "same name, and mark it with 'locked': true):\n- " + "\n- ".join(locked_activities) + "\n\n"
+        )
     user_prompt = f"""A traveler's trip needs to be re-planned due to a disruption.
 
 ORIGINAL TRIP CONTEXT:
@@ -136,6 +143,7 @@ DISRUPTION EVENT: {disruption}
 
 TRAVELER PREFERENCES: {', '.join(preferences) if preferences else 'general'}
 
+{locked_block}
 Re-generate the itinerary adapting to this disruption. Keep the same JSON format.
 Adjust affected days, swap outdoor activities for indoor ones if weather is the issue,
 suggest alternative venues if a place is closed. Explain changes in weather_note fields."""
@@ -147,6 +155,87 @@ suggest alternative venues if a place is closed. Explain changes in weather_note
         return await _call_gemini(user_prompt)
     # elif provider == "groq":
     #     return await _call_groq(user_prompt)
+    else:
+        raise ValueError("No LLM API key configured")
+
+
+ACTIVITY_SYSTEM_PROMPT = """You are an expert local travel planner editing ONE activity inside an existing day plan.
+Return exactly one activity as strict JSON (no markdown, no prose) in this shape:
+{
+  "time": "09:00",
+  "name": "Place name",
+  "location": "Full street address of the place",
+  "latitude": 35.7148,
+  "longitude": 139.7967,
+  "description": "1-2 sentences",
+  "category": "temple|museum|food|nature|shopping|entertainment|landmark",
+  "estimated_cost_usd": 0,
+  "duration_hours": 1.5,
+  "indoor": false,
+  "change_note": "One short sentence on what changed and why"
+}
+
+RULES:
+1. Keep the same time slot unless the traveler's instruction asks to move it.
+2. Fit the day's theme, weather, budget level, walking limit, accessibility and diet.
+3. Never duplicate another activity already planned that day.
+4. Use a real place with a real street address and plausible lat/lng.
+5. Return ONLY the JSON object."""
+
+
+async def generate_activity(
+    destination: str,
+    activity: dict[str, Any],
+    mode: str,
+    instruction: str,
+    other_activities: list[str],
+    date: str,
+    day_theme: str,
+    weather_note: str,
+    budget_level: str,
+    preferences: list[str],
+    traveler_type: str,
+    constraints: dict[str, Any],
+) -> dict[str, Any]:
+    """Swap or regenerate a single activity without touching the rest of the day."""
+    current = {k: activity.get(k) for k in (
+        "time", "name", "location", "description", "category",
+        "estimated_cost_usd", "duration_hours", "indoor",
+    )}
+    if mode == "swap":
+        task = (
+            "TASK: SWAP. Propose a DIFFERENT activity for this time slot. "
+            f"It must not be '{current.get('name')}' or any near-identical venue."
+        )
+    else:
+        task = (
+            "TASK: REGENERATE. Keep the same activity idea (same place is fine) but rewrite it with "
+            "fresh, more useful details, correcting anything vague or wrong."
+        )
+    if instruction:
+        task += f"\nTRAVELER'S REQUEST: {instruction}"
+
+    user_prompt = f"""Destination: {destination}
+Day: {date or 'n/a'} — theme: {day_theme or 'n/a'}
+Weather: {weather_note or 'unknown'}
+Budget level: {budget_level}; Traveler: {traveler_type}
+Interests: {', '.join(preferences) if preferences else 'general sightseeing'}
+Max daily walking: {constraints.get('max_daily_walking_km', 10)} km; Accessibility: {constraints.get('accessibility_needs', False)}; Diet: {constraints.get('dietary_restrictions', 'none')}
+
+CURRENT ACTIVITY IN THIS SLOT:
+{json.dumps(current, ensure_ascii=False)}
+
+OTHER ACTIVITIES ALREADY PLANNED THAT DAY (do not repeat): {', '.join(other_activities) if other_activities else 'none'}
+
+{task}
+
+Return the single replacement activity as JSON."""
+
+    provider = settings.llm_provider
+    if provider == "anthropic":
+        return await _call_anthropic(user_prompt, system=ACTIVITY_SYSTEM_PROMPT, max_tokens=1024)
+    elif provider == "gemini":
+        return await _call_gemini(user_prompt, system=ACTIVITY_SYSTEM_PROMPT, max_tokens=1024)
     else:
         raise ValueError("No LLM API key configured")
 
@@ -176,10 +265,12 @@ async def call_anthropic_text(
         return "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
 
 
-async def _call_anthropic(user_prompt: str) -> dict[str, Any]:
+async def _call_anthropic(
+    user_prompt: str, system: str = SYSTEM_PROMPT, max_tokens: int = 8192
+) -> dict[str, Any]:
     """Generate an itinerary via Anthropic and parse the JSON reply."""
     content = await call_anthropic_text(
-        SYSTEM_PROMPT, [{"role": "user", "content": user_prompt}], max_tokens=8192
+        system, [{"role": "user", "content": user_prompt}], max_tokens=max_tokens
     )
     logger.info("Anthropic response received (%d chars)", len(content))
     # Tolerate stray markdown fences or prose around the JSON object
@@ -215,17 +306,19 @@ async def _call_anthropic(user_prompt: str) -> dict[str, Any]:
 #         return json.loads(content)
 
 
-async def _call_gemini(user_prompt: str) -> dict[str, Any]:
+async def _call_gemini(
+    user_prompt: str, system: str = SYSTEM_PROMPT, max_tokens: int = 4096
+) -> dict[str, Any]:
     """Call the Google Gemini API."""
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
         f"gemini-2.0-flash:generateContent?key={settings.gemini_api_key}"
     )
     payload = {
-        "contents": [{"parts": [{"text": SYSTEM_PROMPT + "\n\n" + user_prompt}]}],
+        "contents": [{"parts": [{"text": system + "\n\n" + user_prompt}]}],
         "generationConfig": {
             "temperature": 0.7,
-            "maxOutputTokens": 4096,
+            "maxOutputTokens": max_tokens,
             "responseMimeType": "application/json",
         },
     }

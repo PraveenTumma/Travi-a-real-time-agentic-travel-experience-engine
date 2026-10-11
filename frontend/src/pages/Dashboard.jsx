@@ -54,6 +54,10 @@ export default function Dashboard({ user }) {
   const [viewingSavedTrip, setViewingSavedTrip] = useState(null);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
+  // Per-activity editing: { dayIdx, actIdx, mode: 'swap'|'regenerate', loading }
+  const [activityEdit, setActivityEdit] = useState(null);
+  const [editInstruction, setEditInstruction] = useState('');
+  const [changedActivity, setChangedActivity] = useState(null); // { key, note }
 
   // Carousel state
   const [activeDay, setActiveDay] = useState(0);
@@ -84,8 +88,9 @@ export default function Dashboard({ user }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [itinerary, goNext, goPrev]);
 
-  // Reset activeDay when new itinerary loads
-  useEffect(() => { setActiveDay(0); }, [itinerary]);
+  // Reset activeDay when a NEW trip loads (not when a single activity is edited or locked in place)
+  const tripKey = itinerary ? [itinerary.destination, itinerary.summary, itinerary.itinerary?.length].join('|') : '';
+  useEffect(() => { setActiveDay(0); }, [tripKey]);
 
   // Fetch Maps API key
   useEffect(() => {
@@ -126,6 +131,8 @@ export default function Dashboard({ user }) {
     setLoading(true);
     setError('');
     setItinerary(null);
+    setChangedActivity(null);
+    setActivityEdit(null);
 
     try {
       const res = await fetch(`${API_BASE}/api/plan`, {
@@ -159,10 +166,113 @@ export default function Dashboard({ user }) {
     }
   };
 
+  const tripContext = () => ({
+    budget_level: budgetLevel,
+    preferences: selectedPrefs,
+    traveler_type: travelerType,
+    constraints: {
+      max_daily_walking_km: maxWalking,
+      accessibility_needs: accessibility,
+      dietary_restrictions: dietary,
+    },
+  });
+
+  const lockedActivityLabels = (trip) =>
+    (trip?.itinerary || []).flatMap((d) =>
+      (d.activities || []).filter((a) => a?.locked).map((a) => `Day ${d.day}: ${a.name}`)
+    );
+
+  const updateActivity = (dayIdx, actIdx, updater) => {
+    setItinerary((prev) => {
+      if (!prev?.itinerary) return prev;
+      const days = prev.itinerary.map((d, di) => {
+        if (di !== dayIdx) return d;
+        const activities = (d.activities || []).map((a, ai) => (ai === actIdx ? updater(a) : a));
+        return { ...d, activities };
+      });
+      return { ...prev, itinerary: days };
+    });
+  };
+
+  const toggleLock = (dayIdx, actIdx) => {
+    updateActivity(dayIdx, actIdx, (a) => ({ ...a, locked: !a.locked }));
+  };
+
+  const handleActivityEdit = async (dayIdx, actIdx, mode, instruction = '') => {
+    const day = itinerary?.itinerary?.[dayIdx];
+    const act = day?.activities?.[actIdx];
+    if (!day || !act || act.locked) return;
+    setActivityEdit({ dayIdx, actIdx, mode, loading: true });
+    setError('');
+
+    try {
+      const res = await fetch(`${API_BASE}/api/activity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          destination: itinerary.destination || destination,
+          date: day.date || '',
+          day_theme: day.theme || '',
+          weather_note: day.weather_note || '',
+          mode,
+          instruction: instruction.trim(),
+          activity: act,
+          other_activities: (day.activities || []).filter((_, i) => i !== actIdx).map((a) => a.name),
+          ...tripContext(),
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const detail = typeof errData.detail === 'string' ? errData.detail : '';
+        throw new Error(detail || `Activity update failed: ${res.status}`);
+      }
+      const data = await res.json();
+      const next = data.activity || {};
+      const oldCost = Number(act.estimated_cost_usd) || 0;
+      const newCost = Number(next.estimated_cost_usd) || 0;
+      const delta = newCost - oldCost;
+
+      setItinerary((prev) => {
+        if (!prev?.itinerary) return prev;
+        const days = prev.itinerary.map((d, di) => {
+          if (di !== dayIdx) return d;
+          const activities = (d.activities || []).map((a, ai) => (ai === actIdx ? { ...next, locked: false } : a));
+          const dayBudget = Number(d.daily_budget_estimate_usd);
+          return {
+            ...d,
+            activities,
+            ...(Number.isFinite(dayBudget) && dayBudget > 0
+              ? { daily_budget_estimate_usd: Math.max(0, Math.round(dayBudget + delta)) }
+              : {}),
+          };
+        });
+        const total = Number(prev.total_estimated_cost_usd);
+        return {
+          ...prev,
+          itinerary: days,
+          ...(Number.isFinite(total) && total > 0
+            ? { total_estimated_cost_usd: Math.max(0, Math.round(total + delta)) }
+            : {}),
+        };
+      });
+      setChangedActivity({
+        key: `${dayIdx}-${actIdx}`,
+        note: next.change_note || (mode === 'swap' ? `Swapped in ${next.name}` : 'Details refreshed'),
+      });
+      setEditInstruction('');
+      setActivityEdit(null);
+    } catch (err) {
+      setError(err.message || 'Failed to update that activity.');
+      setActivityEdit(null);
+    }
+  };
+
   const handleReplan = async (disruption) => {
     if (!itinerary) return;
     setReplanLoading(true);
     setError('');
+    setChangedActivity(null);
+    setActivityEdit(null);
 
     try {
       const res = await fetch(`${API_BASE}/api/replan`, {
@@ -182,6 +292,7 @@ export default function Dashboard({ user }) {
           },
           disruption,
           original_itinerary_summary: itinerary.summary || '',
+          locked_activities: lockedActivityLabels(itinerary),
         }),
       });
 
@@ -692,13 +803,37 @@ export default function Dashboard({ user }) {
 
                               {/* Activities */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                {(currentDay.activities || []).map((act, i) => (
-                                  <div key={i} style={{
-                                    display: 'flex', gap: '1rem', padding: '1rem',
-                                    background: 'white', borderRadius: '8px',
-                                    border: '2px solid var(--ink-black)',
-                                    boxShadow: '3px 3px 0px var(--ink-black)'
-                                  }}>
+                                {(currentDay.activities || []).map((act, i) => {
+                                  const editKey = `${activeDay}-${i}`;
+                                  const isEditing = activityEdit && activityEdit.dayIdx === activeDay && activityEdit.actIdx === i;
+                                  const isBusy = isEditing && activityEdit.loading;
+                                  const anyBusy = !!activityEdit?.loading;
+                                  const showInstruction = isEditing && !activityEdit.loading && activityEdit.mode === 'regenerate';
+                                  const justChanged = changedActivity?.key === editKey;
+                                  const locked = !!act.locked;
+                                  const smallBtn = (bg, disabled) => ({
+                                    padding: '4px 10px', borderRadius: '8px', fontSize: '0.9rem',
+                                    border: '2px solid var(--ink-black)', background: bg,
+                                    color: 'var(--ink-black)', fontFamily: 'Nunito, sans-serif', fontWeight: 'bold',
+                                    cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
+                                    boxShadow: disabled ? 'none' : '2px 2px 0px var(--ink-black)',
+                                  });
+                                  return (
+                                  <motion.div
+                                    key={`${i}-${act.name}`}
+                                    layout
+                                    initial={justChanged ? { scale: 0.96, opacity: 0.4 } : false}
+                                    animate={{ scale: 1, opacity: isBusy ? 0.55 : 1 }}
+                                    transition={{ duration: 0.35 }}
+                                    style={{
+                                      display: 'flex', gap: '1rem', padding: '1rem',
+                                      background: justChanged ? '#fff6cc' : (locked ? '#fffaf0' : 'white'),
+                                      borderRadius: '8px',
+                                      border: locked ? '2px solid var(--marker-yellow)' : '2px solid var(--ink-black)',
+                                      boxShadow: locked ? '3px 3px 0px var(--marker-yellow)' : '3px 3px 0px var(--ink-black)',
+                                      position: 'relative', transition: 'background 0.6s',
+                                    }}
+                                  >
                                     <div className="cartoon-font" style={{ minWidth: '60px', color: 'var(--marker-red)', fontSize: '1.2rem' }}>
                                       {act.time}
                                     </div>
@@ -706,6 +841,7 @@ export default function Dashboard({ user }) {
                                       <div className="cartoon-font" style={{ fontSize: '1.5rem', marginBottom: '4px', color: 'var(--ink-black)' }}>
                                         {act.name}
                                         {act.indoor && <span style={{ marginLeft: '8px', fontSize: '1rem', color: 'var(--text-secondary)' }}>🏠 Indoor</span>}
+                                        {locked && <span style={{ marginLeft: '8px', fontSize: '1rem', color: '#b8860b' }}>🔒 Locked</span>}
                                       </div>
                                       <div style={{ color: 'var(--text-secondary)', fontSize: '1rem', fontFamily: 'Nunito, sans-serif' }}>{act.description}</div>
                                       {act.location && (
@@ -721,9 +857,66 @@ export default function Dashboard({ user }) {
                                           borderRadius: '8px', color: 'white', border: '2px solid var(--ink-black)'
                                         }}>{act.category}</span>
                                       </div>
+
+                                      {justChanged && changedActivity?.note && (
+                                        <div style={{ marginTop: '8px', fontSize: '0.9rem', fontFamily: 'Nunito, sans-serif', color: '#7a5c00', background: '#fff1b8', border: '1.5px dashed #e0b400', borderRadius: '8px', padding: '4px 8px' }}>
+                                          ✨ {changedActivity.note}
+                                        </div>
+                                      )}
+
+                                      {/* Per-activity actions: lock / swap / regenerate */}
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px', alignItems: 'center' }} role="group" aria-label={`Edit ${act.name}`}>
+                                        <button type="button"
+                                          onClick={() => toggleLock(activeDay, i)}
+                                          disabled={anyBusy}
+                                          title={locked ? 'Unlock so this can be changed or re-planned' : 'Keep this exactly as is, even during a re-plan'}
+                                          style={smallBtn(locked ? 'var(--marker-yellow)' : 'var(--paper-white)', anyBusy)}
+                                        >
+                                          {locked ? '🔓 Unlock' : '🔒 Lock'}
+                                        </button>
+                                        <button type="button"
+                                          onClick={() => handleActivityEdit(activeDay, i, 'swap')}
+                                          disabled={locked || anyBusy}
+                                          title="Replace with a different activity in this time slot"
+                                          style={smallBtn('#d9ecff', locked || anyBusy)}
+                                        >
+                                          {isBusy && activityEdit.mode === 'swap' ? '🔁 Swapping…' : '🔁 Swap'}
+                                        </button>
+                                        <button type="button"
+                                          onClick={() => {
+                                            if (showInstruction) { setActivityEdit(null); setEditInstruction(''); }
+                                            else { setEditInstruction(''); setActivityEdit({ dayIdx: activeDay, actIdx: i, mode: 'regenerate', loading: false }); }
+                                          }}
+                                          disabled={locked || anyBusy}
+                                          title="Rewrite this activity, optionally with a request like cheaper or earlier"
+                                          style={smallBtn(showInstruction ? 'var(--marker-green)' : '#e6fff5', locked || anyBusy)}
+                                        >
+                                          {isBusy && activityEdit.mode === 'regenerate' ? '✨ Regenerating…' : '✨ Regenerate'}
+                                        </button>
+                                      </div>
+
+                                      {showInstruction && (
+                                        <form
+                                          onSubmit={(e) => { e.preventDefault(); handleActivityEdit(activeDay, i, 'regenerate', editInstruction); }}
+                                          style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}
+                                        >
+                                          <input
+                                            autoFocus
+                                            value={editInstruction}
+                                            onChange={(e) => setEditInstruction(e.target.value)}
+                                            maxLength={300}
+                                            placeholder="Optional: e.g. cheaper, earlier, kid-friendly, less walking"
+                                            aria-label="What should change about this activity?"
+                                            style={{ flex: 1, minWidth: '200px', padding: '6px 10px', borderRadius: '8px', border: '2px solid var(--ink-black)', fontFamily: 'Nunito, sans-serif', fontSize: '0.95rem', background: 'white', color: 'var(--ink-black)' }}
+                                          />
+                                          <button type="submit" style={smallBtn('var(--marker-green)', false)}>Go ✨</button>
+                                          <button type="button" onClick={() => { setActivityEdit(null); setEditInstruction(''); }} style={smallBtn('var(--paper-white)', false)}>Cancel</button>
+                                        </form>
+                                      )}
                                     </div>
-                                  </div>
-                                ))}
+                                  </motion.div>
+                                  );
+                                })}
                               </div>
 
                               {/* Meals */}

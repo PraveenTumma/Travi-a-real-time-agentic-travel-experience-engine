@@ -207,3 +207,111 @@ class TestReplanEndpoint:
         }
         response = client.post("/api/replan", json=payload)
         assert response.status_code == 422
+
+
+class TestActivityEditEndpoint:
+    """Tests for POST /api/activity (swap / regenerate one activity)."""
+
+    BASE = {
+        "destination": "Tokyo, Japan",
+        "date": "2026-06-01",
+        "day_theme": "Culture & History",
+        "weather_note": "Sunny",
+        "activity": MOCK_ITINERARY["itinerary"][0]["activities"][0],
+        "other_activities": ["Meiji Shrine"],
+        "budget_level": "moderate",
+        "preferences": ["temples"],
+        "traveler_type": "solo",
+    }
+
+    @patch("main.generate_activity", new_callable=AsyncMock)
+    def test_swap_returns_single_activity(self, mock_gen):
+        """A swap should return one activity object with the itinerary field shape."""
+        mock_gen.return_value = {
+            "time": "09:00",
+            "name": "Meiji Jingu",
+            "location": "1-1 Yoyogikamizonocho, Shibuya City, Tokyo",
+            "latitude": 35.6764,
+            "longitude": 139.6993,
+            "description": "Peaceful Shinto shrine in a forest.",
+            "category": "temple",
+            "estimated_cost_usd": 0,
+            "duration_hours": 1.5,
+            "indoor": False,
+            "change_note": "Swapped for a quieter shrine nearby.",
+        }
+        response = client.post("/api/activity", json={**self.BASE, "mode": "swap"})
+        assert response.status_code == 200
+        body = response.json()
+        assert body["mode"] == "swap"
+        act = body["activity"]
+        assert act["name"] == "Meiji Jingu"
+        assert act["locked"] is False
+        for key in ("time", "location", "description", "category", "estimated_cost_usd", "duration_hours", "indoor"):
+            assert key in act
+        kwargs = mock_gen.call_args.kwargs
+        assert kwargs["mode"] == "swap"
+        assert kwargs["other_activities"] == ["Meiji Shrine"]
+
+    @patch("main.generate_activity", new_callable=AsyncMock)
+    def test_regenerate_fills_missing_fields_from_original(self, mock_gen):
+        """Fields the model omits should fall back to the original activity."""
+        mock_gen.return_value = {"name": "Senso-ji Temple", "description": "Updated details."}
+        response = client.post(
+            "/api/activity", json={**self.BASE, "mode": "regenerate", "instruction": "more detail"}
+        )
+        assert response.status_code == 200
+        act = response.json()["activity"]
+        assert act["description"] == "Updated details."
+        assert act["time"] == "09:00"
+        assert act["location"] == "2-3-1 Asakusa, Taito City, Tokyo"
+        assert mock_gen.call_args.kwargs["instruction"] == "more detail"
+
+    @patch("main.generate_activity", new_callable=AsyncMock)
+    def test_llm_failure_returns_500(self, mock_gen):
+        """An upstream failure should surface as a 500 with a friendly message."""
+        mock_gen.side_effect = RuntimeError("boom")
+        response = client.post("/api/activity", json={**self.BASE, "mode": "swap"})
+        assert response.status_code == 500
+
+    @patch("main.generate_activity", new_callable=AsyncMock)
+    def test_unusable_model_reply_returns_500(self, mock_gen):
+        """A reply with no name is not an activity."""
+        mock_gen.return_value = {"description": "no name here"}
+        response = client.post("/api/activity", json={**self.BASE, "mode": "swap"})
+        assert response.status_code == 500
+
+    def test_invalid_mode_rejected(self):
+        """Only swap and regenerate are allowed."""
+        response = client.post("/api/activity", json={**self.BASE, "mode": "delete"})
+        assert response.status_code == 422
+
+    def test_activity_without_name_rejected(self):
+        """The slot being edited must have a name."""
+        response = client.post("/api/activity", json={**self.BASE, "activity": {"time": "09:00"}})
+        assert response.status_code == 422
+
+    def test_instruction_too_long_rejected(self):
+        """Instruction is capped at 300 characters."""
+        response = client.post("/api/activity", json={**self.BASE, "instruction": "x" * 301})
+        assert response.status_code == 422
+
+
+class TestReplanLockedActivities:
+    """Locked activities ride along with /api/replan."""
+
+    @patch("services.orchestrator.TripOrchestrator.replan_trip", new_callable=AsyncMock)
+    def test_locked_activities_forwarded(self, mock_replan):
+        """locked_activities should reach the orchestrator, sanitized."""
+        mock_replan.return_value = MOCK_ITINERARY
+        payload = {
+            "original_destination": "Tokyo, Japan",
+            "start_date": "2026-06-01",
+            "end_date": "2026-06-04",
+            "disruption": "Heavy rain expected on Day 2",
+            "locked_activities": ["Day 1: Senso-ji Temple", "  ", "Day 2: <b>teamLab</b>"],
+        }
+        response = client.post("/api/replan", json=payload)
+        assert response.status_code == 200
+        locked = mock_replan.call_args.kwargs["locked_activities"]
+        assert locked == ["Day 1: Senso-ji Temple", "Day 2: teamLab"]
