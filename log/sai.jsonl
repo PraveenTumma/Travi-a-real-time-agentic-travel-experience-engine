@@ -10,3 +10,4 @@
 {"at":"2026-10-11T09:35:16.806Z","by":"sai","kind":"auto","text":"now working on: Updating PITCH.md with WhatsApp share usage"}
 {"at":"2026-10-11T09:35:32.286Z","by":"sai","kind":"auto","text":"idle"}
 {"at":"2026-10-11T09:49:30.630Z","by":"sai","kind":"auto","text":"now working on: Adding per-activity edit (swap/lock/regenerate one item) — new POST /api/activity endpoint + Dashboard UI"}
+{"at":"2026-10-11T09:59:43.957Z","by":"sai","kind":"note","text":"LIVE: https://travi-ai.vercel.app (Sai's Vercel, frontend + /api backend). API waits on ANTHROPIC_* env vars. Shiv: please send Sai the RouterPlus key."}
