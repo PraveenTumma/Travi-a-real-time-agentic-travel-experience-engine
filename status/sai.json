@@ -2,20 +2,9 @@
   "member": "sai",
   "state": "working",
   "branch": "main",
-  "editing": [
-    "frontend/src/pages/Dashboard.jsx",
-    "main.py",
-    "models.py",
-    "services/llm_service.py",
-    "services/orchestrator.py",
-    "tests/test_api.py",
-    "be_err.log",
-    "be_out.log",
-    "fe_err.log",
-    "fe_out.log"
-  ],
+  "editing": [],
   "unpushed": 0,
-  "last_seen": "2026-10-11T09:59:15.129Z",
+  "last_seen": "2026-10-11T10:03:36.684Z",
   "doing": "Adding per-activity edit (swap/lock/regenerate one item) — new POST /api/activity endpoint + Dashboard UI",
   "doing_since": "2026-10-11T09:49:30.630Z",
   "planned_files": [
