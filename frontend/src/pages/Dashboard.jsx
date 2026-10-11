@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Bookmark, Trash2, Eye, Share2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Bookmark, Trash2, Eye, Share2, Ticket } from 'lucide-react';
 import { saveTrip, subscribeToSavedTrips, deleteSavedTrip, subscribeToSharedTrips } from '../services/firestoreService';
 import ItineraryMap from '../components/ItineraryMap';
 import TripChatbot from '../components/TripChatbot';
 import ShareTripModal from '../components/ShareTripModal';
+import TicketBooking from '../components/TicketBooking';
 
 const PREFERENCE_OPTIONS = [
   { id: 'street-food', label: '🍜 Street Food', value: 'street food' },
@@ -51,6 +52,7 @@ export default function Dashboard({ user }) {
   const [saveStatus, setSaveStatus] = useState(''); // '' | 'saving' | 'saved'
   const [viewingSavedTrip, setViewingSavedTrip] = useState(null);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
 
   // Carousel state
   const [activeDay, setActiveDay] = useState(0);
@@ -509,6 +511,24 @@ export default function Dashboard({ user }) {
                       <Bookmark size={14} fill={saveStatus === 'saved' ? 'white' : 'none'} />
                       {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Save'}
                     </button>
+                    <button
+                      onClick={() => setIsBookingOpen(true)}
+                      style={{
+                        padding: '0.4rem 0.75rem', borderRadius: '8px',
+                        border: '2px solid var(--ink-black)',
+                        background: 'var(--marker-green)',
+                        color: 'white',
+                        fontFamily: 'Nunito, sans-serif', fontWeight: 'bold', fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        boxShadow: '2px 2px 0px var(--ink-black)',
+                        display: 'flex', alignItems: 'center', gap: '4px',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <Ticket size={14} />
+                      Book Travel
+                    </button>
                     {user && (
                       <button
                         onClick={() => setIsShareOpen(true)}
@@ -942,6 +962,17 @@ export default function Dashboard({ user }) {
 
       {/* Share Trip Modal */}
       <AnimatePresence>
+        {isBookingOpen && (
+          <TicketBooking
+            user={user}
+            initial={{
+              destination: itinerary?.destination || destination,
+              date: startDate,
+              returnDate: endDate,
+            }}
+            onClose={() => setIsBookingOpen(false)}
+          />
+        )}
         {isShareOpen && itinerary && user && (
           <ShareTripModal
             user={user}

@@ -303,3 +303,18 @@ python -m pytest tests/ -v
 Built at **PromptWars: Hyderabad** — Google for Developers × Hack2Skill
 
 *Powered by Google Cloud ☁️ and way too much ☕*
+
+## Ticket Booking (prototype)
+
+Book bus, train and flight tickets for individuals or groups, in India and abroad, from the
+**Book Travel** button on a generated itinerary (destination and dates are prefilled, with a
+"Book return trip" shortcut).
+
+- **Flow:** search → choose service/class → traveller details → simulated payment → ticket with PNR and seats; cancel with a refund per the policy (90% / 75% / 50% / 0% at 48h / 24h / 4h before departure; convenience fee is non-refundable).
+- **Prototype data:** services, fares and availability are generated deterministically per route and date (`services/booking_catalog.py`) using fictional operators. Swap in real providers by replacing `search_options` / `get_option`.
+- **Rules:** seats are held for 10 minutes; infants (<2) travel on a lap; international flights need a passport for each traveller; seats are never oversold (SQLite transactions).
+- **Payment:** simulated only, with selectable success / decline / timeout outcomes. No card data is accepted.
+- **Access:** bookings are tied to the contact email (`X-Contact-Email` header). Firebase token verification is a planned follow-up.
+- **Config:** `BOOKING_DB_PATH` (default `data/bookings.db`). On hosts with ephemeral disks (e.g. Render free tier) bookings reset on redeploy.
+- **API:** `GET /api/booking/locations`, `GET /api/booking/search`, `POST /api/bookings`, `GET /api/bookings`, `GET /api/bookings/{pnr}`, `POST /api/bookings/{pnr}/pay`, `POST /api/bookings/{pnr}/cancel`.
+- **Tests:** `pytest tests/test_booking.py` (backend) and `cd frontend && npm test` (UI).

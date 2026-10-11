@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -24,6 +25,7 @@ from config import settings
 from models import TripRequest, ReplanRequest, HealthResponse
 from services.orchestrator import TripOrchestrator
 from security import RateLimiter, sanitize_input, SecurityHeadersMiddleware
+from booking_api import router as booking_router
 
 # Configure logging
 logging.basicConfig(
@@ -72,11 +74,21 @@ app.add_middleware(
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-Contact-Email"],
 )
 
 # Security headers
 app.add_middleware(SecurityHeadersMiddleware)
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError):
+    """Return 422 details without echoing submitted values (IDs, card numbers)."""
+    errors = [{k: v for k, v in err.items() if k not in ("input", "ctx", "url")} for err in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": errors})
+
+
+# Ticket booking (prototype)
+app.include_router(booking_router)
 
 
 # --- API Routes ---

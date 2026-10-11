@@ -110,13 +110,19 @@ async def generate_itinerary(
 
 Generate a complete day-by-day itinerary as JSON."""
 
+    return await _dispatch(user_prompt)
+
+
+async def _dispatch(user_prompt: str) -> dict[str, Any]:
+    """Route the prompt to the configured LLM provider."""
     provider = settings.llm_provider
+    if provider == "anthropic":
+        return await _call_anthropic(user_prompt)
     if provider == "gemini":
         return await _call_gemini(user_prompt)
-    elif provider == "groq":
+    if provider == "groq":
         return await _call_groq(user_prompt)
-    else:
-        raise ValueError("No LLM API key configured")
+    raise ValueError("No LLM API key configured")
 
 
 async def generate_replan(
@@ -138,13 +144,34 @@ Re-generate the itinerary adapting to this disruption. Keep the same JSON format
 Adjust affected days, swap outdoor activities for indoor ones if weather is the issue,
 suggest alternative venues if a place is closed. Explain changes in weather_note fields."""
 
-    provider = settings.llm_provider
-    if provider == "gemini":
-        return await _call_gemini(user_prompt)
-    elif provider == "groq":
-        return await _call_groq(user_prompt)
-    else:
-        raise ValueError("No LLM API key configured")
+    return await _dispatch(user_prompt)
+
+
+async def _call_anthropic(user_prompt: str) -> dict[str, Any]:
+    """Call the Anthropic Messages API."""
+    headers = {
+        "x-api-key": settings.anthropic_api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    payload = {
+        "model": "claude-haiku-5-5",
+        "max_tokens": 8192,
+        "temperature": 0.7,
+        "system": SYSTEM_PROMPT,
+        "messages": [{"role": "user", "content": user_prompt}],
+    }
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            "https://api.anthropic.com/v1/messages", json=payload, headers=headers
+        )
+        response.raise_for_status()
+        content = response.json()["content"][0]["text"].strip()
+        logger.info("Anthropic response received (%d chars)", len(content))
+        if content.startswith("```"):
+            content = content.strip("`").removeprefix("json").strip()
+        return json.loads(content)
 
 
 async def _call_groq(user_prompt: str) -> dict[str, Any]:

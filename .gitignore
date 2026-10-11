@@ -26,3 +26,6 @@ Thumbs.db
 
 # WhatsApp images (not needed in repo)
 *.jpeg
+
+# Prototype booking database
+data/
