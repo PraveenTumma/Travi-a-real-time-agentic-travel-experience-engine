@@ -1,0 +1,26 @@
+{
+  "member": "praveen",
+  "state": "idle",
+  "branch": "main",
+  "editing": [
+    ".claude/commands/delegate.md",
+    ".claude/commands/handoff.md",
+    ".claude/commands/team.md",
+    ".claude/settings.json",
+    ".claude/team/members.json",
+    ".claude/team/team.mjs",
+    "CLAUDE.md",
+    "PITCH.md",
+    "frontend/index.html",
+    "frontend/src/utils/whatsapp.js",
+    "main.py",
+    "requirements.txt",
+    "tests/test_api.py",
+    ".gitignore",
+    "config.py",
+    "frontend/src/pages/Dashboard.jsx",
+    "services/llm_service.py"
+  ],
+  "unpushed": 2,
+  "last_seen": "2026-10-11T09:15:21.864Z"
+}
