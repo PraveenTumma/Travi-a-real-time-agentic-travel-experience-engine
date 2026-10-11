@@ -27,3 +27,7 @@ export function holdSecondsLeft(holdExpiresAt, nowMs) {
   if (!holdExpiresAt) return 0;
   return Math.max(0, Math.floor((new Date(`${holdExpiresAt}Z`).getTime() - nowMs) / 1000));
 }
+
+/** Whole days between departure and arrival (0 for same-day services). */
+export const dayOffset = (option) =>
+  Math.round((new Date(`${option.arrival.slice(0, 10)}T00:00`) - new Date(`${option.departure.slice(0, 10)}T00:00`)) / 86400000);

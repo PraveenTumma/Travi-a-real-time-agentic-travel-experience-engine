@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { money, fmtDuration, fmtTime, errorMessage, holdSecondsLeft } from './booking';
+import { money, fmtDuration, fmtTime, errorMessage, holdSecondsLeft, dayOffset } from './booking';
 
 describe('money', () => {
   it('formats INR without decimals', () => {
@@ -44,5 +44,12 @@ describe('holdSecondsLeft', () => {
   });
   it('is zero when no hold exists', () => {
     expect(holdSecondsLeft(null, Date.now())).toBe(0);
+  });
+});
+
+describe('dayOffset', () => {
+  it('is 0 for same-day and 1 for overnight services', () => {
+    expect(dayOffset({ departure: '2026-11-15T09:00', arrival: '2026-11-15T11:10' })).toBe(0);
+    expect(dayOffset({ departure: '2026-11-15T22:30', arrival: '2026-11-16T06:10' })).toBe(1);
   });
 });

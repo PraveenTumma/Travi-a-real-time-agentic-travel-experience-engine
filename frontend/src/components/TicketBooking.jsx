@@ -5,7 +5,7 @@ import {
   X, Plane, TrainFront, Bus, Users, ArrowRight, Clock, CheckCircle2,
   AlertTriangle, Ticket, Printer, Undo2, Plus, Minus, ArrowLeftRight,
 } from 'lucide-react';
-import { money, fmtDuration, fmtTime, fmtDate, errorMessage, holdSecondsLeft } from '../utils/booking';
+import { money, fmtDuration, fmtTime, fmtDate, errorMessage, holdSecondsLeft, dayOffset } from '../utils/booking';
 
 const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin;
 const EMAIL_KEY = 'travi_booking_email';
@@ -428,7 +428,7 @@ export default function TicketBooking({ user, initial, onClose }) {
                       {o.operator} <span style={{ fontWeight: 'normal' }}>{o.service_number}</span>
                     </div>
                     <div style={{ fontSize: '1.1rem', fontWeight: 900 }}>
-                      {fmtTime(o.departure)} → {fmtTime(o.arrival)}
+                      {fmtTime(o.departure)} → {fmtTime(o.arrival)}{dayOffset(o) > 0 && <sup title="Arrives next day"> +{dayOffset(o)}</sup>}
                       <span style={{ fontWeight: 'normal', fontSize: '0.85rem', marginLeft: 8 }}><Clock size={12} /> {fmtDuration(o.duration_minutes)}</span>
                     </div>
                   </div>
