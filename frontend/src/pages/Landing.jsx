@@ -97,7 +97,9 @@ export default function Landing({ onLoginSuccess }) {
     { name: "React", icon: <Braces size={32} color="var(--marker-blue)" /> },
     { name: "Firebase", icon: <Database size={32} color="var(--marker-yellow)" /> },
     { name: "Vite", icon: <Zap size={32} color="var(--marker-blue)" /> },
-    { name: "Llama 3", icon: <Sparkles size={32} color="var(--marker-red)" /> }
+    { name: "Claude Sonnet 5.5", icon: <Sparkles size={32} color="var(--marker-red)" /> },
+    { name: "Google Maps", icon: <MapPin size={32} color="var(--marker-green)" /> },
+    { name: "Live Weather", icon: <Cloud size={32} color="var(--marker-blue)" /> }
   ];
 
   return (
@@ -242,7 +244,7 @@ export default function Landing({ onLoginSuccess }) {
             }}
           >
             <Sparkles size={18} fill="var(--ink-black)"/>
-            Magic by Llama 3
+            Weather-aware AI • Re-plans in seconds
           </motion.div>
 
           {/* Animated Arrows Pointing to Logo - Perfectly Anchored to the Text */}
@@ -376,7 +378,7 @@ export default function Landing({ onLoginSuccess }) {
         {/* 2.5 Infinite Tech Stack Carousel */}
         <section style={{ overflow: 'hidden', padding: '2rem 0', marginBottom: '2rem', display: 'flex', flexWrap: 'nowrap' }}>
           <motion.div
-            animate={{ x: [0, -1035] }}
+            animate={{ x: ['0%', '-33.333%'] }}
             transition={{
               repeat: Infinity,
               duration: 20,
@@ -432,7 +434,7 @@ export default function Landing({ onLoginSuccess }) {
               <Zap size={48} fill="var(--marker-yellow)" color="var(--ink-black)" style={{ marginBottom: '1rem' }} />
               <h3 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Smart AI Magic</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', lineHeight: '1.5', fontWeight: '800' }}>
-                Llama 3 reads your crazy constraints (vegan, $50 budget) and makes it work effortlessly!
+                Tell it your crazy constraints (vegan, $50 budget, bad knees) and it builds a plan that actually works.
               </p>
             </div>
 
