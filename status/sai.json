@@ -2,9 +2,14 @@
   "member": "sai",
   "state": "idle",
   "branch": "main",
-  "editing": [],
+  "editing": [
+    "be_err.log",
+    "be_out.log",
+    "fe_err.log",
+    "fe_out.log"
+  ],
   "unpushed": 0,
-  "last_seen": "2026-10-11T09:13:56.811Z",
+  "last_seen": "2026-10-11T09:15:52.745Z",
   "doing": "",
   "doing_since": "2026-10-11T09:12:58.244Z",
   "planned_files": []
