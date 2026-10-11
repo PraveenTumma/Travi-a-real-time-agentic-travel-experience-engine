@@ -6,3 +6,4 @@
 {"at":"2026-10-11T10:17:12.031Z","by":"praveen","kind":"auto","text":"idle"}
 {"at":"2026-10-11T10:23:32.053Z","by":"praveen","kind":"auto","text":"now working on: Diagnosing Firebase config / login on Vercel"}
 {"at":"2026-10-11T10:25:21.067Z","by":"praveen","kind":"note","text":"Firebase diagnosis (read-only probes): code config is fine, but travi-vibesprint has Authentication NOT initialized (CONFIGURATION_NOT_FOUND) and NO Firestore database (404). Needs console steps by the project owner: enable Google sign-in, add travi-ai.vercel.app to Authorized domains, create Firestore DB, deploy firestore.rules. Checklist + probe commands are in README; firebase.json/.firebaserc added."}
+{"at":"2026-10-11T10:25:34.509Z","by":"praveen","kind":"auto","text":"idle"}
