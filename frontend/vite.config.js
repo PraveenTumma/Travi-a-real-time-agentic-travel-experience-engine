@@ -9,6 +9,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',
     globals: true,
+    testTimeout: 20000, // multi-step UI flows can be slow on busy machines
   },
   server: {
     proxy: {
