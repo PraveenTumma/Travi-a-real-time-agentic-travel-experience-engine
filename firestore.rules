@@ -1,0 +1,26 @@
+rules_version = '2';
+// Paste into Firebase Console -> Firestore -> Rules. Signed-in users only; personal trips stay private.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+
+    match /users/{uid} {
+      allow read: if signedIn();                       // friend lookup by email
+      allow write: if signedIn() && request.auth.uid == uid;
+    }
+    match /savedTrips/{id} {
+      allow read, update, delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+    }
+    match /sharedTrips/{id} {
+      allow read, update: if signedIn() && request.auth.uid in resource.data.members;
+      allow create: if signedIn() && request.resource.data.createdBy == request.auth.uid;
+    }
+    match /friendRequests/{id} {
+      allow read, create, update: if signedIn();
+    }
+    match /friends/{id} {
+      allow read, create: if signedIn();
+    }
+  }
+}
