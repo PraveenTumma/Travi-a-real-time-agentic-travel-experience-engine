@@ -2,3 +2,4 @@
 {"at":"2026-10-11T08:57:16.416Z","by":"sai","kind":"note","text":"PITCH.md pushed: answers to the 4 judging criteria + 90s demo script. Read it before stage."}
 {"at":"2026-10-11T08:57:21.063Z","by":"sai","kind":"auto","text":"idle"}
 {"at":"2026-10-11T09:12:58.244Z","by":"sai","kind":"auto","text":"now working on: Vercel same-origin backend (api/index.py, root vercel.json) + landing copy (no more Llama 3)"}
+{"at":"2026-10-11T09:13:52.351Z","by":"sai","kind":"note","text":"Backend now deploys on Vercel itself (api/index.py + root vercel.json). Vercel needs: Root Directory = repo root, env ANTHROPIC_BASE_URL=https://api.routerplus.com, ANTHROPIC_AUTH_TOKEN=<routerplus key>, ANTHROPIC_MODEL=claude-sonnet-5-5, GOOGLE_MAPS_API_KEY. Remove VITE_API_BASE if set."}
