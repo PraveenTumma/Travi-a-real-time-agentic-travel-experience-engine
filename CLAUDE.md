@@ -1,6 +1,6 @@
 # Travi! — shared guide for every Claude Code session on this repo
 
-Three people build this together, each with their own Claude Code: **Sai** (`sai`), **Shiv** (`shiv`), **Praveen** (`praveen`).
+Three people build this together, each with their own Claude Code: **Praneeth** (`sai`), **Shiv** (`shiv`), **Praveen** (`praveen`).
 Current context: Vibe Sprint Hyderabad (The Product Folks x Scaler), Sun 11 Oct 2026, 12:00–16:00 IST. Live demos, no slides, so a working, impressive app beats everything else.
 
 ## Team Sync (read this first)
