@@ -9,12 +9,10 @@
     "fe_out.log"
   ],
   "unpushed": 0,
-  "last_seen": "2026-10-11T09:34:22.422Z",
-  "doing": "Own Vercel deploy + env-driven Firebase config + firestore.rules",
-  "doing_since": "2026-10-11T09:34:17.416Z",
+  "last_seen": "2026-10-11T09:35:16.805Z",
+  "doing": "Updating PITCH.md with WhatsApp share usage",
+  "doing_since": "2026-10-11T09:35:16.806Z",
   "planned_files": [
-    "frontend/src/firebase.js",
-    "firestore.rules",
-    "firebase.json"
+    "PITCH.md"
   ]
 }
