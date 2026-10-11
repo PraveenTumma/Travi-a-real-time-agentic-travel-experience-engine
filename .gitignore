@@ -31,3 +31,5 @@ Thumbs.db
 data/
 
 .venv/
+.vercel
+.env*
