@@ -315,6 +315,6 @@ Book bus, train and flight tickets for individuals or groups, in India and abroa
 - **Rules:** seats are held for 10 minutes; infants (<2) travel on a lap; international flights need a passport for each traveller; seats are never oversold (SQLite transactions).
 - **Payment:** simulated only, with selectable success / decline / timeout outcomes. No card data is accepted.
 - **Access:** bookings are tied to the contact email (`X-Contact-Email` header). Firebase token verification is a planned follow-up.
-- **Config:** `BOOKING_DB_PATH` (default `data/bookings.db`). On hosts with ephemeral disks (e.g. Render free tier) bookings reset on redeploy.
+- **Config:** `BOOKING_DB_PATH` (default `data/bookings.db`, or `/tmp/travi_bookings.db` on Vercel). Storage is ephemeral on Render's free tier and per-instance on Vercel serverless, so bookings can reset on redeploy or when a cold instance starts. Fine for a demo; use a hosted database before real use.
 - **API:** `GET /api/booking/locations`, `GET /api/booking/search`, `POST /api/bookings`, `GET /api/bookings`, `GET /api/bookings/{pnr}`, `POST /api/bookings/{pnr}/pay`, `POST /api/bookings/{pnr}/cancel`.
 - **Tests:** `pytest tests/test_booking.py` (backend) and `cd frontend && npm test` (UI).

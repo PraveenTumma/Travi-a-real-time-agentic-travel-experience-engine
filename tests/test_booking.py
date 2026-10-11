@@ -700,6 +700,16 @@ def test_concurrent_group_bookings_never_oversell(tmp_path):
     assert service.store.seats_taken(opt.option_id, cls, NOW) <= cap
 
 
+def test_default_db_path_is_writable_location_on_vercel(monkeypatch):
+    monkeypatch.delenv("BOOKING_DB_PATH", raising=False)
+    monkeypatch.delenv("VERCEL", raising=False)
+    assert booking_api.default_db_path() == "data/bookings.db"
+    monkeypatch.setenv("VERCEL", "1")
+    assert booking_api.default_db_path() == "/tmp/travi_bookings.db"
+    monkeypatch.setenv("BOOKING_DB_PATH", "/custom/b.db")
+    assert booking_api.default_db_path() == "/custom/b.db"
+
+
 def test_bookings_persist_across_store_instances(tmp_path):
     path = str(tmp_path / "persist.db")
     clock = Clock()

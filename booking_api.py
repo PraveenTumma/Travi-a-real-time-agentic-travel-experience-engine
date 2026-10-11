@@ -20,11 +20,18 @@ booking_limiter = RateLimiter(max_requests=40, window_seconds=60)
 _service: BookingService | None = None
 
 
+def default_db_path() -> str:
+    """Where bookings live. Vercel's filesystem is read-only except /tmp (and per-instance)."""
+    if os.getenv("BOOKING_DB_PATH"):
+        return os.environ["BOOKING_DB_PATH"]
+    return "/tmp/travi_bookings.db" if os.getenv("VERCEL") else "data/bookings.db"
+
+
 def get_service() -> BookingService:
     """Lazily build the service so the DB path can be set by environment or tests."""
     global _service
     if _service is None:
-        _service = BookingService(BookingStore(os.getenv("BOOKING_DB_PATH", "data/bookings.db")))
+        _service = BookingService(BookingStore(default_db_path()))
     return _service
 
 
