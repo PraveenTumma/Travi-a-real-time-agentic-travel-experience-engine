@@ -1,24 +1,13 @@
 {
   "member": "praveen",
-  "state": "working",
+  "state": "idle",
   "branch": "main",
   "editing": [
     "Travi-Pitch-Deck.html"
   ],
   "unpushed": 0,
-  "last_seen": "2026-10-11T10:16:35.718Z",
-  "doing": "Adding Origin field + world place suggestions (Trip Details, plan API, saved/shared trips, booking)",
+  "last_seen": "2026-10-11T10:17:12.027Z",
+  "doing": "",
   "doing_since": "2026-10-11T09:49:22.604Z",
-  "planned_files": [
-    "frontend/src/pages/Dashboard.jsx",
-    "models.py",
-    "main.py",
-    "services/llm_service.py",
-    "services/orchestrator.py",
-    "services/booking_catalog.py",
-    "services/booking_service.py",
-    "booking_api.py",
-    "frontend/src/components/TicketBooking.jsx",
-    "frontend/src/services/firestoreService.js"
-  ]
+  "planned_files": []
 }

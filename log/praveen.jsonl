@@ -3,3 +3,4 @@
 {"at":"2026-10-11T09:19:05.200Z","by":"praveen","kind":"auto","text":"idle"}
 {"at":"2026-10-11T09:49:22.604Z","by":"praveen","kind":"auto","text":"now working on: Adding Origin field + world place suggestions (Trip Details, plan API, saved/shared trips, booking)"}
 {"at":"2026-10-11T10:17:03.497Z","by":"praveen","kind":"note","text":"Origin field shipped: new optional 'origin' on POST /api/plan and /api/replan (echoed into itinerary.origin); new GET /api/places/suggest?q= (worldwide typeahead via Open-Meteo geocoding, no new env vars); /api/booking/search accepts geo: tokens for origin/destination. Frontend: PlaceInput.jsx, utils/api.js; savedTrips/sharedTrips docs gain origin + originValue. Dashboard.jsx touched (Trip Details field, Book Travel prefill)."}
+{"at":"2026-10-11T10:17:12.031Z","by":"praveen","kind":"auto","text":"idle"}
