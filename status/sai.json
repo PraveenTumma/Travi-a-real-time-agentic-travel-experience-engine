@@ -1,6 +1,6 @@
 {
   "member": "sai",
-  "state": "idle",
+  "state": "working",
   "branch": "main",
   "editing": [
     "be_err.log",
@@ -9,8 +9,13 @@
     "fe_out.log"
   ],
   "unpushed": 0,
-  "last_seen": "2026-10-11T09:47:19.536Z",
-  "doing": "",
-  "doing_since": "2026-10-11T09:35:16.806Z",
-  "planned_files": []
+  "last_seen": "2026-10-11T09:49:30.628Z",
+  "doing": "Adding per-activity edit (swap/lock/regenerate one item) — new POST /api/activity endpoint + Dashboard UI",
+  "doing_since": "2026-10-11T09:49:30.630Z",
+  "planned_files": [
+    "main.py",
+    "models.py",
+    "services/llm_service.py",
+    "frontend/src/pages/Dashboard.jsx"
+  ]
 }
