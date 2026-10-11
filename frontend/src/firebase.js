@@ -6,13 +6,13 @@ import { getAnalytics } from "firebase/analytics";
 // Override with VITE_FIREBASE_* env vars to point at a different Firebase project (no code change).
 const env = import.meta.env;
 const firebaseConfig = {
-  apiKey: env.VITE_FIREBASE_API_KEY || "AIzaSyAFFeWHk2utN48at8YgMks6Ffv4C-WjTlM",
-  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "travi-cd6fa.firebaseapp.com",
-  projectId: env.VITE_FIREBASE_PROJECT_ID || "travi-cd6fa",
-  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || "travi-cd6fa.firebasestorage.app",
-  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || "250617724054",
-  appId: env.VITE_FIREBASE_APP_ID || "1:250617724054:web:53cc49a06ea9e3bc49d6b7",
-  measurementId: env.VITE_FIREBASE_MEASUREMENT_ID || "G-SPK0S508E2",
+  apiKey: env.VITE_FIREBASE_API_KEY || "AIzaSyBfrtpkXRHnff_q-mxOV_ScZVxoPbarauY",
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "travi-vibesprint.firebaseapp.com",
+  projectId: env.VITE_FIREBASE_PROJECT_ID || "travi-vibesprint",
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || "travi-vibesprint.firebasestorage.app",
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || "511331436266",
+  appId: env.VITE_FIREBASE_APP_ID || "1:511331436266:web:77ef24ca425eb156ea3993",
+  measurementId: env.VITE_FIREBASE_MEASUREMENT_ID || "G-H7TR0EDNVB",
 };
 
 // Initialize Firebase (check if already initialized for HMR)
