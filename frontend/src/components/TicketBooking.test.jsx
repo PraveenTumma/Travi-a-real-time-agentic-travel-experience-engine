@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -44,8 +43,9 @@ beforeEach(() => {
     'POST /api/bookings/TRVABCD234/pay': () => json(200, confirmed),
     'POST /api/bookings/TRVABCD234/cancel': () => json(200, { ...confirmed, status: 'CANCELLED', cancellable: false, refund_amount: '5040' }),
     'GET /api/bookings': () => json(200, { bookings: [confirmed] }),
+    'GET /api/places/suggest': () => json(200, { places: [] }),
   };
-  global.fetch = vi.fn((url, opts = {}) => {
+  globalThis.fetch = vi.fn((url, opts = {}) => {
     const path = new URL(url, 'http://localhost').pathname;
     const handler = routes[`${opts.method || 'GET'} ${path}`];
     return handler ? handler(opts) : json(404, { detail: `no route ${path}` });
@@ -91,7 +91,7 @@ describe('TicketBooking', () => {
     await searchFlow(user);
     expect(await screen.findByText('Indus Air')).toBeInTheDocument();
     expect(screen.getByText(/09:00 → 11:10/)).toBeInTheDocument();
-    const calls = global.fetch.mock.calls.map(([u]) => u);
+    const calls = globalThis.fetch.mock.calls.map(([u]) => u);
     expect(calls.some((u) => u.includes('/api/booking/search?') && u.includes('origin=Delhi') && u.includes('passengers=1'))).toBe(true);
     // Sold-out class cannot be selected
     expect(screen.getByRole('button', { name: /Business/ })).toBeDisabled();
@@ -109,7 +109,7 @@ describe('TicketBooking', () => {
     const user = userEvent.setup();
     setup({ initial: { destination: 'Mumbai' } });
     await user.click(screen.getByRole('button', { name: /search options/i }));
-    expect(global.fetch.mock.calls.some(([u]) => u.includes('/search'))).toBe(false);
+    expect(globalThis.fetch.mock.calls.some(([u]) => u.includes('/search'))).toBe(false);
   });
 
   it('adjusts traveller count within 1-9', async () => {
@@ -133,7 +133,7 @@ describe('TicketBooking', () => {
     // payment step shows the quote and the hold timer
     expect(await screen.findByText(/Seats held for/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Pay/ })).toHaveTextContent('5,675');
-    const createCall = global.fetch.mock.calls.find(([u, o]) => u.endsWith('/api/bookings') && o.method === 'POST');
+    const createCall = globalThis.fetch.mock.calls.find(([u, o]) => u.endsWith('/api/bookings') && o.method === 'POST');
     expect(JSON.parse(createCall[1].body)).toMatchObject({
       option_id: option.option_id, travel_class: 'Economy', contact_email: 'a@b.co', user_id: 'u1',
       passengers: [{ name: 'Asha Rao', age: 30, id_number: '123412341234' }],
@@ -143,7 +143,7 @@ describe('TicketBooking', () => {
     expect(await screen.findByTestId('pnr')).toHaveTextContent('TRVABCD234');
     expect(screen.getByText('Booking confirmed')).toBeInTheDocument();
     expect(screen.getByText('15A')).toBeInTheDocument();
-    const payCall = global.fetch.mock.calls.find(([u]) => u.endsWith('/pay'));
+    const payCall = globalThis.fetch.mock.calls.find(([u]) => u.endsWith('/pay'));
     expect(JSON.parse(payCall[1].body)).toEqual({ method: 'upi', test_scenario: 'success' });
     expect(payCall[1].headers['X-Contact-Email']).toBe('a@b.co');
     expect(localStorage.getItem('travi_booking_email')).toBe('a@b.co');
@@ -245,10 +245,97 @@ describe('TicketBooking', () => {
   });
 
   it('reports a network failure', async () => {
-    global.fetch = vi.fn((url) => (String(url).includes('locations') ? json(200, { locations: [] }) : Promise.reject(new Error('down'))));
+    globalThis.fetch = vi.fn((url) => (String(url).includes('locations') ? json(200, { locations: [] }) : Promise.reject(new Error('down'))));
     const user = userEvent.setup();
     setup();
     await searchFlow(user);
     expect(await screen.findByRole('alert')).toHaveTextContent('Cannot reach the booking service');
+  });
+
+  describe('places', () => {
+    const RANCHI = { name: 'Ranchi', label: 'Ranchi, Jharkhand, India', value: 'geo:RANCHI', kind: 'place', country_code: 'IN' };
+    const searchUrls = () => globalThis.fetch.mock.calls.map(([u]) => u).filter((u) => u.includes('/api/booking/search'));
+
+    it('suggests places while typing in From and sends the picked place to the search', async () => {
+      routes['GET /api/places/suggest'] = () => json(200, { places: [RANCHI] });
+      const user = userEvent.setup();
+      setup();
+      await user.type(screen.getByLabelText('From'), 'ranchi');
+      await user.click(await screen.findByRole('option', { name: /Ranchi/ }));
+      expect(screen.getByLabelText('From')).toHaveValue('Ranchi, Jharkhand, India');
+      fireEvent.change(screen.getByLabelText('To'), { target: { value: 'Mumbai' } });
+      fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
+      await user.click(screen.getByRole('button', { name: /search options/i }));
+      await screen.findByText('Indus Air');
+      const params = new URL(searchUrls()[0], 'http://localhost').searchParams;
+      expect(params.get('origin')).toBe('geo:RANCHI'); // the structured pick, not the label
+      expect(params.get('destination')).toBe('Mumbai'); // free text still works
+    });
+
+    it('sends typed text when no suggestion was picked', async () => {
+      const user = userEvent.setup();
+      setup();
+      await searchFlow(user);
+      await screen.findByText('Indus Air');
+      expect(new URL(searchUrls()[0], 'http://localhost').searchParams.get('origin')).toBe('Delhi');
+    });
+
+    it('typing again after a pick drops the structured place', async () => {
+      routes['GET /api/places/suggest'] = () => json(200, { places: [RANCHI] });
+      const user = userEvent.setup();
+      setup();
+      await user.type(screen.getByLabelText('From'), 'ranchi');
+      await user.click(await screen.findByRole('option'));
+      await user.type(screen.getByLabelText('From'), ' Station');
+      fireEvent.change(screen.getByLabelText('To'), { target: { value: 'Mumbai' } });
+      fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-11-15' } });
+      await user.click(screen.getByRole('button', { name: /search options/i }));
+      await screen.findByText('Indus Air');
+      expect(new URL(searchUrls()[0], 'http://localhost').searchParams.get('origin')).toBe('Ranchi, Jharkhand, India Station');
+    });
+
+    it('uses the origin place handed over from the trip form', async () => {
+      const user = userEvent.setup();
+      setup({ initial: { origin: 'Ranchi, Jharkhand, India', originPlace: RANCHI, destination: 'Mumbai, India', date: '2026-11-15' } });
+      expect(screen.getByLabelText('From')).toHaveValue('Ranchi, Jharkhand, India');
+      await user.click(screen.getByRole('button', { name: /search options/i }));
+      await screen.findByText('Indus Air');
+      expect(new URL(searchUrls()[0], 'http://localhost').searchParams.get('origin')).toBe('geo:RANCHI');
+    });
+
+    it('swaps the picked places for the return trip', async () => {
+      const user = userEvent.setup();
+      setup({ initial: { origin: 'Ranchi, Jharkhand, India', originPlace: RANCHI, destination: 'Mumbai', date: '2026-11-15', returnDate: '2026-11-20' } });
+      await user.click(screen.getByRole('button', { name: /search options/i }));
+      await fillTraveller(user);
+      await user.click(screen.getByRole('button', { name: /hold seats/i }));
+      await user.click(await screen.findByRole('button', { name: /Pay/ }));
+      await user.click(await screen.findByRole('button', { name: /book return trip/i }));
+      expect(screen.getByLabelText('To')).toHaveValue('Ranchi, Jharkhand, India');
+      await user.click(screen.getByRole('button', { name: /search options/i }));
+      await waitFor(() => expect(searchUrls()).toHaveLength(2));
+      const params = new URL(searchUrls()[1], 'http://localhost').searchParams;
+      expect(params.get('destination')).toBe('geo:RANCHI');
+      expect(params.get('origin')).toBe('Mumbai');
+    });
+
+    it('shows a ticket without an empty "()" for places that have no code', async () => {
+      const placeOption = { ...option, origin: { code: '', name: 'Ranchi', country: 'India', country_code: 'IN' } };
+      routes['GET /api/booking/search'] = () => json(200, {
+        origin: placeOption.origin, destination: option.destination, date: '2026-11-15',
+        available_modes: ['air'], results: [placeOption], prototype: true,
+      });
+      routes['POST /api/bookings/TRVABCD234/pay'] = () => json(200, { ...confirmed, service: placeOption });
+      const user = userEvent.setup();
+      setup();
+      await searchFlow(user);
+      await fillTraveller(user);
+      await user.click(screen.getByRole('button', { name: /hold seats/i }));
+      await user.click(await screen.findByRole('button', { name: /Pay/ }));
+      await screen.findByTestId('pnr');
+      expect(screen.getByText('Ranchi')).toBeInTheDocument();
+      expect(screen.queryByText(/Ranchi \(\)/)).not.toBeInTheDocument();
+      expect(screen.getByText('Mumbai (BOM)')).toBeInTheDocument();
+    });
   });
 });

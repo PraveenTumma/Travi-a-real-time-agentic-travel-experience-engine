@@ -4,6 +4,7 @@ AI-powered dynamic trip planning with preferences, constraints,
 and real-time weather updates. Built for Google PromptWars hackathon.
 """
 
+import html
 import json
 import logging
 import os
@@ -31,6 +32,7 @@ from services.orchestrator import TripOrchestrator
 from services.llm_service import call_anthropic_text, generate_activity
 from security import RateLimiter, sanitize_input, SecurityHeadersMiddleware
 from booking_api import router as booking_router
+from places_api import router as places_router
 
 # Configure logging
 logging.basicConfig(
@@ -94,6 +96,7 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 
 # Ticket booking (prototype)
 app.include_router(booking_router)
+app.include_router(places_router)
 
 
 # --- API Routes ---
@@ -108,6 +111,11 @@ async def health_check():
 async def get_maps_key():
     """Return Google Maps API key for frontend map rendering."""
     return {"key": settings.google_maps_api_key}
+
+
+def _clean_origin(value: str | None) -> str | None:
+    """Strip markup from the origin. It only feeds the LLM prompt, so un-escape what sanitize_input escaped."""
+    return html.unescape(sanitize_input(value)) if value else None
 
 
 @app.post("/api/plan", tags=["Planning"])
@@ -127,6 +135,7 @@ async def plan_trip(request: Request, trip: TripRequest):
 
     # Sanitize inputs
     destination = sanitize_input(trip.destination)
+    origin = _clean_origin(trip.origin)
 
     try:
         result = await orchestrator.plan_trip(
@@ -137,6 +146,7 @@ async def plan_trip(request: Request, trip: TripRequest):
             preferences=[sanitize_input(p) for p in trip.preferences],
             traveler_type=trip.traveler_type,
             constraints=trip.constraints.model_dump(),
+            origin=origin,
         )
         return JSONResponse(content=result)
 
@@ -171,6 +181,7 @@ async def replan_trip(request: Request, replan: ReplanRequest):
             disruption=sanitize_input(replan.disruption),
             original_summary=sanitize_input(replan.original_itinerary_summary),
             locked_activities=[sanitize_input(a) for a in replan.locked_activities],
+            origin=_clean_origin(replan.origin),
         )
         return JSONResponse(content=result)
 

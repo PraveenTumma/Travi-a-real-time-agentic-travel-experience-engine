@@ -26,6 +26,7 @@ class TripOrchestrator:
         preferences: list[str] | None = None,
         traveler_type: str = "solo",
         constraints: dict[str, Any] | None = None,
+        origin: str | None = None,
     ) -> dict[str, Any]:
         """Generate a complete trip itinerary with real-time data.
 
@@ -40,6 +41,7 @@ class TripOrchestrator:
             preferences: User interests list.
             traveler_type: solo/couple/family/group.
             constraints: Trip constraints dictionary.
+            origin: Where the traveler starts from (optional).
 
         Returns:
             Complete itinerary dictionary with weather-aware plans.
@@ -68,7 +70,10 @@ class TripOrchestrator:
             traveler_type=traveler_type,
             constraints=constraints,
             weather_data=weather_data,
+            origin=origin,
         )
+        if origin:
+            itinerary["origin"] = origin  # lets saved/shared trips pre-fill Book Travel
 
         # Enrich with weather data if not already included
         if "weather_data" not in itinerary:
@@ -88,6 +93,7 @@ class TripOrchestrator:
         disruption: str,
         original_summary: str = "",
         locked_activities: list[str] | None = None,
+        origin: str | None = None,
     ) -> dict[str, Any]:
         """Re-plan a trip based on a disruption event.
 
@@ -119,7 +125,8 @@ class TripOrchestrator:
             weather_context = "Current weather: " + "; ".join(lines)
 
         context = (
-            f"Destination: {original_destination}, "
+            (f"Traveling from: {origin}. " if origin else "")
+            + f"Destination: {original_destination}, "
             f"Dates: {start_date} to {end_date}, "
             f"Budget: {budget_level}, Traveler: {traveler_type}, "
             f"Constraints: {constraints}. "
@@ -127,4 +134,7 @@ class TripOrchestrator:
             f"Original plan summary: {original_summary}"
         )
 
-        return await generate_replan(context, disruption, preferences, locked_activities or [])
+        result = await generate_replan(context, disruption, preferences, locked_activities or [])
+        if origin:
+            result["origin"] = origin
+        return result

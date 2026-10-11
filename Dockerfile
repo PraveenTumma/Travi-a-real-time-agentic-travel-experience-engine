@@ -19,7 +19,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend source
-COPY main.py config.py models.py security.py booking_api.py booking_models.py ./
+COPY main.py config.py models.py security.py booking_api.py booking_models.py places_api.py ./
 COPY services/ ./services/
 COPY tests/ ./tests/
 

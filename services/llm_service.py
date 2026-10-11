@@ -69,6 +69,7 @@ async def generate_itinerary(
     traveler_type: str,
     constraints: dict[str, Any],
     weather_data: list[dict[str, Any]],
+    origin: str | None = None,
 ) -> dict[str, Any]:
     """Generate a trip itinerary using the configured LLM provider.
 
@@ -81,6 +82,7 @@ async def generate_itinerary(
         traveler_type: Type of traveler.
         constraints: Trip constraints dict.
         weather_data: Real-time weather forecast data.
+        origin: Where the traveler starts from (optional).
 
     Returns:
         Parsed itinerary dictionary.
@@ -96,8 +98,16 @@ async def generate_itinerary(
             )
         weather_context = "REAL-TIME WEATHER FORECAST:\n" + "\n".join(weather_lines)
 
+    origin_context = ""
+    if origin:
+        origin_context = (
+            f"- Traveling from: {origin}\n"
+            "- Account for the journey from the origin: keep day 1 realistic for arrival time "
+            "and leave time to depart on the last day.\n"
+        )
+
     user_prompt = f"""Plan a trip with these details:
-- Destination: {destination}
+{origin_context}- Destination: {destination}
 - Dates: {start_date} to {end_date}
 - Budget Level: {budget_level}
 - Interests: {', '.join(preferences) if preferences else 'general sightseeing'}

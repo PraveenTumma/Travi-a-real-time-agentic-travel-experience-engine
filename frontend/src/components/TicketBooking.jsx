@@ -5,9 +5,10 @@ import {
   X, Plane, TrainFront, Bus, Users, ArrowRight, Clock, CheckCircle2,
   AlertTriangle, Ticket, Printer, Undo2, Plus, Minus, ArrowLeftRight,
 } from 'lucide-react';
+import PlaceInput from './PlaceInput';
+import { API_BASE } from '../utils/api';
 import { money, fmtDuration, fmtTime, fmtDate, errorMessage, holdSecondsLeft, dayOffset } from '../utils/booking';
 
-const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin;
 const EMAIL_KEY = 'travi_booking_email';
 
 const MODE_META = {
@@ -94,13 +95,13 @@ function Ticket_({ booking, onCancel, onReturn, cancelling }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: '1.6rem', fontWeight: 900 }}>{fmtTime(s.departure)}</div>
-          <div style={{ fontWeight: 'bold' }}>{s.origin.name} ({s.origin.code})</div>
+          <div style={{ fontWeight: 'bold' }}>{s.origin.name}{s.origin.code ? ` (${s.origin.code})` : ''}</div>
           <div style={{ fontSize: '0.85rem' }}>{fmtDate(s.departure)}</div>
         </div>
         <div style={{ textAlign: 'center', fontSize: '0.8rem' }}><ArrowRight /><div>{fmtDuration(s.duration_minutes)}</div></div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '1.6rem', fontWeight: 900 }}>{fmtTime(s.arrival)}</div>
-          <div style={{ fontWeight: 'bold' }}>{s.destination.name} ({s.destination.code})</div>
+          <div style={{ fontWeight: 'bold' }}>{s.destination.name}{s.destination.code ? ` (${s.destination.code})` : ''}</div>
           <div style={{ fontSize: '0.85rem' }}>{fmtDate(s.arrival)}</div>
         </div>
       </div>
@@ -178,6 +179,8 @@ export default function TicketBooking({ user, initial, onClose }) {
     origin: initial?.origin || '', destination: initial?.destination || '',
     date: initial?.date || '', passengers: 1, mode: '',
   });
+  // The suggestion the user picked for each end (null = free text). Its `value` is what the API resolves.
+  const [places, setPlaces] = useState({ origin: initial?.originPlace || null, destination: initial?.destinationPlace || null });
   const [results, setResults] = useState(null);
   const [sort, setSort] = useState('departure');
   const [selected, setSelected] = useState(null); // { option, cls }
@@ -194,11 +197,6 @@ export default function TicketBooking({ user, initial, onClose }) {
   const [notice, setNotice] = useState('');
   const [mine, setMine] = useState(null);
   const [now, setNow] = useState(() => Date.now());
-  const [locations, setLocations] = useState([]);
-
-  useEffect(() => {
-    api('/api/booking/locations').then((d) => setLocations(d.locations)).catch(() => {});
-  }, []);
 
   // Seat-hold countdown.
   useEffect(() => {
@@ -215,6 +213,10 @@ export default function TicketBooking({ user, initial, onClose }) {
 
   const patch = (setter) => (key) => (e) => setter((prev) => ({ ...prev, [key]: e.target.value }));
   const setField = patch(setSearch);
+  const setPlace = (role) => (text, place) => {
+    setSearch((s) => ({ ...s, [role]: text }));
+    setPlaces((p) => ({ ...p, [role]: place }));
+  };
 
   const run = useCallback(async (fn) => {
     setBusy(true); setError(''); setNotice('');
@@ -228,7 +230,9 @@ export default function TicketBooking({ user, initial, onClose }) {
     }
     run(async () => {
       const qs = new URLSearchParams({
-        origin: search.origin.trim(), destination: search.destination.trim(), date: search.date,
+        origin: places.origin?.value || search.origin.trim(),
+        destination: places.destination?.value || search.destination.trim(),
+        date: search.date,
         passengers: String(search.passengers),
       });
       if (search.mode) qs.set('mode', search.mode);
@@ -311,6 +315,7 @@ export default function TicketBooking({ user, initial, onClose }) {
 
   const bookReturn = () => {
     setSearch((s) => ({ ...s, origin: s.destination, destination: s.origin, date: initial?.returnDate || '' }));
+    setPlaces((p) => ({ origin: p.destination, destination: p.origin }));
     setBooking(null); setSelected(null); setResults(null); setStep('search'); setNotice(''); setError('');
   };
 
@@ -365,19 +370,18 @@ export default function TicketBooking({ user, initial, onClose }) {
         {tab === 'book' && step === 'search' && (
           <form onSubmit={doSearch} style={{ display: 'grid', gap: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
-              <label style={labelStyle}>From
-                <input list="travi-locations" style={inputStyle} value={search.origin} onChange={setField('origin')} placeholder="e.g. Delhi" required />
-              </label>
-              <label style={labelStyle}>To
-                <input list="travi-locations" style={inputStyle} value={search.destination} onChange={setField('destination')} placeholder="e.g. Mumbai or Dubai" required />
-              </label>
+              <div style={labelStyle}>
+                <label htmlFor="booking-from">From</label>
+                <PlaceInput id="booking-from" style={inputStyle} value={search.origin} onChange={setPlace('origin')} placeholder="City or place, anywhere" required />
+              </div>
+              <div style={labelStyle}>
+                <label htmlFor="booking-to">To</label>
+                <PlaceInput id="booking-to" style={inputStyle} value={search.destination} onChange={setPlace('destination')} placeholder="City or place, anywhere" required />
+              </div>
               <label style={labelStyle}>Date
                 <input type="date" style={inputStyle} value={search.date} onChange={setField('date')} min={new Date().toISOString().slice(0, 10)} required />
               </label>
             </div>
-            <datalist id="travi-locations">
-              {locations.map((l) => <option key={l.code} value={l.name}>{l.country}</option>)}
-            </datalist>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Users size={18} aria-hidden="true" />
@@ -575,6 +579,7 @@ TicketBooking.propTypes = {
   user: PropTypes.shape({ email: PropTypes.string, uid: PropTypes.string }),
   initial: PropTypes.shape({
     origin: PropTypes.string, destination: PropTypes.string, date: PropTypes.string, returnDate: PropTypes.string,
+    originPlace: PropTypes.object, destinationPlace: PropTypes.object,
   }),
   onClose: PropTypes.func.isRequired,
 };

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request
 from booking_models import BookingCreate, PaymentIn
 from security import RateLimiter
 from services import booking_catalog as catalog
+from services import places_service
 from services.booking_service import BookingError, BookingService
 from services.booking_store import BookingStore
 
@@ -31,7 +32,7 @@ def get_service() -> BookingService:
     """Lazily build the service so the DB path can be set by environment or tests."""
     global _service
     if _service is None:
-        _service = BookingService(BookingStore(default_db_path()))
+        _service = BookingService(BookingStore(default_db_path()), geocoder=places_service.geocode_first)
     return _service
 
 
@@ -64,8 +65,8 @@ async def locations(q: str = Query("", max_length=60)):
 @router.get("/api/booking/search")
 def search(
     request: Request,
-    origin: str = Query(..., min_length=2, max_length=80),
-    destination: str = Query(..., min_length=2, max_length=80),
+    origin: str = Query(..., min_length=2, max_length=300),  # text, a catalog code, or a geo: token
+    destination: str = Query(..., min_length=2, max_length=300),
     date: date = Query(...),
     passengers: int = Query(1, ge=1, le=9),
     mode: str | None = Query(None, max_length=10),

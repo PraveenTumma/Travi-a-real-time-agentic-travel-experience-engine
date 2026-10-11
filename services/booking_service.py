@@ -110,22 +110,38 @@ def refund_for(booking: dict, now: datetime) -> Decimal:
 
 
 class BookingService:
-    def __init__(self, store: BookingStore, clock: Callable[[], datetime] = _utcnow):
+    def __init__(self, store: BookingStore, clock: Callable[[], datetime] = _utcnow,
+                 geocoder: Callable[[str], catalog.Location | None] | None = None):
         self.store = store
         self.clock = clock
+        self.geocoder = geocoder  # optional fallback for places outside the curated catalog
+
+    def _resolve(self, text: str, role: str) -> catalog.Location:
+        """Resolve a picked suggestion (code or geo: token) or free text to a Location."""
+        text = (text or "").strip()
+        if text.startswith(catalog.PLACE_PREFIX):
+            loc = catalog.decode_place(text)
+            if loc is None:
+                raise BookingError(400, f"Invalid {role} reference. Pick a place from the suggestions.")
+            return loc
+        loc = catalog.resolve_location(text)
+        if loc is None and self.geocoder is not None:
+            loc = self.geocoder(text)
+        if loc is None:
+            raise BookingError(404, f"Couldn't find {role} '{text}'. Pick a place from the suggestions.")
+        return loc
 
     # ---- search ----
 
     def search(self, origin_text: str, dest_text: str, travel_date: date, mode: str | None,
                passengers: int) -> dict:
         now = self.clock()
-        origin, dest = catalog.resolve_location(origin_text), catalog.resolve_location(dest_text)
-        if not origin:
-            raise BookingError(404, f"Unknown origin '{origin_text}'. Try a major city.")
-        if not dest:
-            raise BookingError(404, f"Unknown destination '{dest_text}'. Try a major city.")
+        origin = self._resolve(origin_text, "origin")
+        dest = self._resolve(dest_text, "destination")
         if origin.code == dest.code:
             raise BookingError(400, "Origin and destination must be different")
+        if not catalog.available_modes(origin, dest):
+            raise BookingError(400, f"{origin.name} and {dest.name} are too close for a booking. Try a farther destination.")
         if mode and mode not in catalog.MODES:
             raise BookingError(400, "mode must be one of air, train, bus")
         if travel_date < now.date():

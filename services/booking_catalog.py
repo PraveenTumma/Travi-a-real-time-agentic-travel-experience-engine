@@ -11,9 +11,13 @@ calls to that provider; the rest of the booking flow only depends on the
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
+import json
 import math
 import random
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -29,6 +33,7 @@ class Location:
     country_code: str
     lat: float
     lng: float
+    kind: str = "city"  # "city" = curated catalog entry (has a 3-letter code); "place" = any world location
 
 
 LOCATIONS: tuple[Location, ...] = (
@@ -81,6 +86,7 @@ RAIL_COUNTRIES = {"IN", "GB", "FR", "JP", "IT"}
 CROSS_BORDER_TRAIN = {frozenset({"LHR", "CDG"})}
 CROSS_BORDER_BUS = {frozenset({"LHR", "CDG"})}
 
+MIN_ROUTE_KM = 30  # closer than this and nobody books a flight, train or coach
 MAX_TRAIN_KM = 2600
 MAX_BUS_KM = 1300
 MAX_ADVANCE_DAYS = 365
@@ -145,7 +151,81 @@ class TransportOption:
 
 
 def _loc_dict(loc: Location) -> dict:
-    return {"code": loc.code, "name": loc.name, "country": loc.country, "country_code": loc.country_code}
+    # Free-form places have no public code; the UI hides the code when it is empty.
+    return {
+        "code": loc.code if loc.kind == "city" else "",
+        "name": loc.name,
+        "country": loc.country,
+        "country_code": loc.country_code,
+    }
+
+
+# --- free-form world places ---------------------------------------------------
+# A place the user picked from the suggestions (anywhere in the world) travels as a
+# self-contained token, so option IDs stay stateless and survive serverless restarts.
+
+PLACE_PREFIX = "geo:"
+_CLEAN_RE = re.compile(r"[\u0000-\u001f\u007f<>]")
+
+
+def _clean_text(value: str, limit: int = 80) -> str:
+    text = re.sub(r"<[^>]*>", " ", str(value))  # drop markup first, then stray angle brackets / control chars
+    return " ".join(_CLEAN_RE.sub(" ", text).split())[:limit]
+
+
+def place_location(name: str, country: str, country_code: str, lat: float, lng: float) -> Location | None:
+    """Build a free-form Location, or None if the inputs are not plausible."""
+    name, country = _clean_text(name), _clean_text(country)
+    cc = (country_code or "").strip().upper()
+    try:
+        lat, lng = float(lat), float(lng)
+    except (TypeError, ValueError):
+        return None
+    if not name or not re.fullmatch(r"[A-Z]{2}", cc) or not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        return None
+    if not all(math.isfinite(v) for v in (lat, lng)):
+        return None
+    lat, lng = round(lat, 4), round(lng, 4)
+    code = "G" + hashlib.sha256(f"{cc}|{lat}|{lng}|{name.lower()}".encode()).hexdigest()[:8].upper()
+    return Location(code, name, country or cc, cc, lat, lng, kind="place")
+
+
+def _ref(loc: Location) -> str:
+    """Compact reference for a location: the catalog code, or a base64url payload."""
+    if loc.kind == "city":
+        return loc.code
+    payload = json.dumps({"n": loc.name, "c": loc.country, "k": loc.country_code, "a": loc.lat, "o": loc.lng},
+                         separators=(",", ":"), ensure_ascii=False)
+    return base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+
+
+def _from_ref(ref: str) -> Location | None:
+    if ref in _BY_CODE:
+        return _BY_CODE[ref]
+    try:
+        data = json.loads(base64.urlsafe_b64decode(ref + "=" * (-len(ref) % 4)).decode())
+        return place_location(data["n"], data["c"], data["k"], data["a"], data["o"])
+    except (binascii.Error, ValueError, KeyError, TypeError, UnicodeDecodeError):
+        return None
+
+
+def encode_place(loc: Location) -> str:
+    """Token the frontend sends back as `origin` / `destination`."""
+    return loc.code if loc.kind == "city" else PLACE_PREFIX + _ref(loc)
+
+
+def decode_place(token: str) -> Location | None:
+    """Resolve a catalog code or a `geo:` token to a Location."""
+    token = (token or "").strip()
+    if token.startswith(PLACE_PREFIX):
+        return _from_ref(token[len(PLACE_PREFIX):])
+    return _BY_CODE.get(token.upper()) if re.fullmatch(r"[A-Za-z]{3}", token) else None
+
+
+def make_option_id(mode: str, origin: Location, dest: Location, travel_date: date, idx: int) -> str:
+    if origin.kind == "city" and dest.kind == "city":
+        return f"{mode}-{origin.code}-{dest.code}-{travel_date.isoformat()}-{idx}"
+    return f"x~{mode}~{_ref(origin)}~{_ref(dest)}~{travel_date.isoformat()}~{idx}"
 
 
 # --- lookup ------------------------------------------------------------------
@@ -199,6 +279,8 @@ def available_modes(origin: Location, dest: Location) -> list[str]:
     if origin.code == dest.code:
         return []
     km = distance_km(origin, dest)
+    if km < MIN_ROUTE_KM:
+        return []
     pair = frozenset({origin.code, dest.code})
     same_country = origin.country_code == dest.country_code
     modes = ["air"]
@@ -331,7 +413,7 @@ def _generate(mode: str, origin: Location, dest: Location, travel_date: date, to
                 "seats_total": _capacity(mode, ci, len(names), rng),
             }
         results.append(TransportOption(
-            option_id=f"{mode}-{origin.code}-{dest.code}-{travel_date.isoformat()}-{idx}",
+            option_id=make_option_id(mode, origin, dest, travel_date, idx),
             mode=mode,
             operator=operator,
             service_number=_service_number(mode, rng, operator),
@@ -351,17 +433,26 @@ def _generate(mode: str, origin: Location, dest: Location, travel_date: date, to
 
 def get_option(option_id: str, today: date | None = None) -> TransportOption | None:
     """Re-derive an option from its ID. Returns None if the ID is invalid."""
-    parts = option_id.split("-")
-    # mode-ORG-DST-YYYY-MM-DD-idx
-    if len(parts) != 7:
-        return None
-    mode, org, dst = parts[0], parts[1], parts[2]
+    if option_id.startswith("x~"):
+        # x~mode~originRef~destRef~YYYY-MM-DD~idx  (free-form places)
+        parts = option_id.split("~")
+        if len(parts) != 6:
+            return None
+        _, mode, oref, dref, date_s, idx_s = parts
+        origin, dest = _from_ref(oref), _from_ref(dref)
+    else:
+        # mode-ORG-DST-YYYY-MM-DD-idx  (catalog cities)
+        parts = option_id.split("-")
+        if len(parts) != 7:
+            return None
+        mode, org, dst = parts[0], parts[1], parts[2]
+        date_s, idx_s = "-".join(parts[3:6]), parts[6]
+        origin, dest = _BY_CODE.get(org), _BY_CODE.get(dst)
     try:
-        travel_date = date(int(parts[3]), int(parts[4]), int(parts[5]))
-        idx = int(parts[6])
+        travel_date = date.fromisoformat(date_s)
+        int(idx_s)
     except ValueError:
         return None
-    origin, dest = _BY_CODE.get(org), _BY_CODE.get(dst)
     if mode not in MODES or not origin or not dest or mode not in available_modes(origin, dest):
         return None
     for opt in _generate(mode, origin, dest, travel_date, today or date.today()):

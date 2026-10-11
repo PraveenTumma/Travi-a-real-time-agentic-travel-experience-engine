@@ -317,4 +317,12 @@ Book bus, train and flight tickets for individuals or groups, in India and abroa
 - **Access:** bookings are tied to the contact email (`X-Contact-Email` header). Firebase token verification is a planned follow-up.
 - **Config:** `BOOKING_DB_PATH` (default `data/bookings.db`, or `/tmp/travi_bookings.db` on Vercel). Storage is ephemeral on Render's free tier and per-instance on Vercel serverless, so bookings can reset on redeploy or when a cold instance starts. Fine for a demo; use a hosted database before real use.
 - **API:** `GET /api/booking/locations`, `GET /api/booking/search`, `POST /api/bookings`, `GET /api/bookings`, `GET /api/bookings/{pnr}`, `POST /api/bookings/{pnr}/pay`, `POST /api/bookings/{pnr}/cancel`.
-- **Tests:** `pytest tests/test_booking.py` (backend) and `cd frontend && npm test` (UI).
+- **Tests:** `pytest tests/test_booking.py tests/test_places.py` (backend) and `cd frontend && npm test` (UI).
+
+### Origin and place suggestions
+
+- **Trip Details** has an optional **Starting from (origin)** field with worldwide suggestions as you type. It is sent with `/api/plan` and `/api/replan` (`origin`), so the itinerary accounts for the journey, shows "Starting from ...", and is stored with saved and shared trips. The last origin is remembered in the browser.
+- **Book Travel** opens with the origin (and the exact place you picked) prefilled; the booking search's From/To boxes use the same suggestions. Any place in the world works: the curated catalog cities (airports/rail/bus hubs) come first, everything else is resolved through Open-Meteo's free geocoding API, so there is no extra API key and no dataset to maintain. If the geocoder is down, suggestions fall back to the catalog and typing free text still works.
+- **API:** `GET /api/places/suggest?q=<text>&limit=8` returns `{places: [{label, name, region, country, country_code, lat, lng, value, kind}]}` (empty for queries under 2 characters; 90 requests/min per IP). `value` is a catalog code or a self-contained `geo:` token that `/api/booking/search` accepts as `origin`/`destination`, keeping option IDs stateless on serverless hosts.
+- **Prototype limits:** places outside the catalog are treated as cities (no airport matching); places closer than 30 km are rejected as too close to book.
+

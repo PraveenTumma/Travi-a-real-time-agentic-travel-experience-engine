@@ -72,7 +72,7 @@ class PassengerIn(BaseModel):
 class BookingCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    option_id: str = Field(min_length=10, max_length=80)
+    option_id: str = Field(min_length=10, max_length=400)
     travel_class: str = Field(min_length=2, max_length=40)
     passengers: list[PassengerIn] = Field(min_length=1, max_length=9)
     contact_email: str

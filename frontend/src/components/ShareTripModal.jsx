@@ -10,7 +10,7 @@ import {
  * ShareTripModal — lets the user pick friends from their list
  * and share the current itinerary with them.
  */
-export default function ShareTripModal({ user, itinerary, destination, startDate, endDate, onClose }) {
+export default function ShareTripModal({ user, itinerary, destination, origin, originValue, startDate, endDate, onClose }) {
   const [friends, setFriends] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [sharing, setSharing] = useState(false);
@@ -49,6 +49,8 @@ export default function ShareTripModal({ user, itinerary, destination, startDate
         user,
         {
           destination: destination || itinerary?.destination || '',
+          origin: origin || itinerary?.origin || '',
+          originValue: originValue || '',
           startDate: startDate || '',
           endDate: endDate || '',
           itinerary: itinerary,

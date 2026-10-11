@@ -747,7 +747,7 @@ class TestApi:
     def test_search_validation_errors(self, api):
         assert api.get("/api/booking/search", params={"origin": "Delhi"}).status_code == 422
         r = api.get("/api/booking/search", params={"origin": "Delhi", "destination": "Nowhere", "date": TRAVEL.isoformat()})
-        assert r.status_code == 404 and "Unknown destination" in r.json()["detail"]
+        assert r.status_code == 404 and "find destination" in r.json()["detail"]
         r = api.get("/api/booking/search", params={"origin": "Delhi", "destination": "Mumbai", "date": "2020-01-01"})
         assert r.status_code == 400
 

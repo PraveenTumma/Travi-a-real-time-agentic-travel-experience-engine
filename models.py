@@ -68,6 +68,18 @@ class TripRequest(BaseModel):
         default_factory=TripConstraints,
         description="Trip constraints",
     )
+    origin: Optional[str] = Field(
+        default=None,
+        max_length=200,
+        description="Where the traveler starts from (optional), e.g. 'Hyderabad, Telangana, India'",
+    )
+
+    @field_validator("origin")
+    @classmethod
+    def clean_origin(cls, v: Optional[str]) -> Optional[str]:
+        """Blank origin means 'not provided'."""
+        v = (v or "").strip()
+        return v or None
 
     @field_validator("budget_level")
     @classmethod
@@ -138,6 +150,14 @@ class ReplanRequest(BaseModel):
     def validate_locked(cls, v: list[str]) -> list[str]:
         """Trim and cap each locked-activity label."""
         return [a.strip()[:150] for a in v if isinstance(a, str) and a.strip()]
+
+    origin: Optional[str] = Field(default=None, max_length=200, description="Where the traveler starts from")
+
+    @field_validator("origin")
+    @classmethod
+    def clean_origin(cls, v: Optional[str]) -> Optional[str]:
+        v = (v or "").strip()
+        return v or None
 
 
 class ActivityEditRequest(BaseModel):

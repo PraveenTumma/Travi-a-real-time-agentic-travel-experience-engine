@@ -8,6 +8,7 @@ import ItineraryMap from '../components/ItineraryMap';
 import TripChatbot from '../components/TripChatbot';
 import ShareTripModal from '../components/ShareTripModal';
 import TicketBooking from '../components/TicketBooking';
+import PlaceInput from '../components/PlaceInput';
 
 const PREFERENCE_OPTIONS = [
   { id: 'street-food', label: '🍜 Street Food', value: 'street food' },
@@ -45,9 +46,24 @@ const formatApiError = (detail, fallback) => {
 
 const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin;
 
+// Remember where the traveller usually starts from, so they don't retype it for every trip.
+const ORIGIN_KEY = 'travi_origin';
+const loadOrigin = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(ORIGIN_KEY) || 'null');
+    if (saved && typeof saved.text === 'string') return { text: saved.text, place: saved.place || null };
+  } catch { /* storage unavailable or corrupt */ }
+  return { text: '', place: null };
+};
+const saveOrigin = (text, place) => {
+  try { localStorage.setItem(ORIGIN_KEY, JSON.stringify({ text, place })); } catch { /* ignore */ }
+};
+
 export default function Dashboard({ user }) {
   const [activeTab, setActiveTab] = useState('basics'); // basics, vibe, fun, needs
 
+  const [origin, setOrigin] = useState(() => loadOrigin().text);
+  const [originPlace, setOriginPlace] = useState(() => loadOrigin().place); // picked suggestion, or null for free text
   const [destination, setDestination] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -136,6 +152,19 @@ export default function Dashboard({ user }) {
     );
   };
 
+  const handleOriginChange = (text, place) => {
+    setOrigin(text);
+    setOriginPlace(place);
+    saveOrigin(text, place);
+  };
+
+  // Restore a saved/shared trip's starting point (older trips have none).
+  const applyTripOrigin = (trip) => {
+    const text = trip.origin || trip.itinerary?.origin || '';
+    setOrigin(text);
+    setOriginPlace(trip.originValue ? { value: trip.originValue, label: text } : null);
+  };
+
   const handleGenerate = async () => {
     if (!destination || !startDate || !endDate) {
       setError('Please fill in destination and dates.');
@@ -153,6 +182,7 @@ export default function Dashboard({ user }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           destination,
+          origin: origin.trim() || undefined,
           start_date: startDate,
           end_date: endDate,
           budget_level: budgetLevel,
@@ -292,6 +322,7 @@ export default function Dashboard({ user }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           original_destination: destination,
+          origin: origin.trim() || undefined,
           start_date: startDate,
           end_date: endDate,
           budget_level: budgetLevel,
@@ -387,6 +418,11 @@ export default function Dashboard({ user }) {
                         exit={{ height: 0, opacity: 0 }}
                         style={{ background: 'white', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}
                       >
+                        <div>
+                          <label htmlFor="origin" style={labelStyle}>Starting from (origin)</label>
+                          <PlaceInput id="origin" value={origin} onChange={handleOriginChange}
+                            placeholder="e.g., Hyderabad, India" style={inputStyle} />
+                        </div>
                         <div>
                           <label htmlFor="destination" style={labelStyle}>Destination *</label>
                           <input id="destination" type="text" placeholder="e.g., Tokyo, Japan" value={destination}
@@ -610,7 +646,7 @@ export default function Dashboard({ user }) {
                       onClick={async () => {
                         setSaveStatus('saving');
                         try {
-                          await saveTrip(user, { destination, startDate, endDate, budgetLevel, travelerType, preferences: selectedPrefs }, itinerary);
+                          await saveTrip(user, { destination, origin: origin.trim(), originValue: originPlace?.value, startDate, endDate, budgetLevel, travelerType, preferences: selectedPrefs }, itinerary);
                           setSaveStatus('saved');
                           setTimeout(() => setSaveStatus(''), 3000);
                         } catch (err) {
@@ -701,6 +737,9 @@ export default function Dashboard({ user }) {
                   <h2 className="cartoon-font" style={{ margin: '0 0 0.5rem 0', fontSize: '2rem', color: 'var(--ink-black)' }}>
                     📍 {itinerary.destination || destination}
                   </h2>
+                  {itinerary.origin && (
+                    <p style={{ margin: '0 0 0.5rem 0', fontWeight: 'bold', color: 'var(--text-secondary)' }}>🛫 Starting from {itinerary.origin}</p>
+                  )}
                   <p style={{ color: 'var(--text-secondary)', margin: '0 0 0.75rem 0', fontSize: '1.1rem', fontWeight: 'bold' }}>{itinerary.summary}</p>
                   {itinerary.weather_overview && (
                     <p className="cartoon-font" style={{ color: 'var(--marker-blue)', fontSize: '1.5rem', margin: 0 }}>🌤️ {itinerary.weather_overview}</p>
@@ -1079,6 +1118,7 @@ export default function Dashboard({ user }) {
                   <button onClick={() => {
                     setItinerary(trip.itinerary);
                     setDestination(trip.destination || '');
+                    applyTripOrigin(trip);
                     setStartDate(trip.startDate || '');
                     setEndDate(trip.endDate || '');
                     setBudgetLevel(trip.budgetLevel || 'moderate');
@@ -1160,6 +1200,7 @@ export default function Dashboard({ user }) {
                 <button onClick={() => {
                   setItinerary(trip.itinerary);
                   setDestination(trip.destination || '');
+                    applyTripOrigin(trip);
                   setStartDate(trip.startDate || '');
                   setEndDate(trip.endDate || '');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1193,6 +1234,8 @@ export default function Dashboard({ user }) {
           <TicketBooking
             user={user}
             initial={{
+              origin: origin || itinerary?.origin || '',
+              originPlace,
               destination: itinerary?.destination || destination,
               date: startDate,
               returnDate: endDate,
@@ -1205,6 +1248,8 @@ export default function Dashboard({ user }) {
             user={user}
             itinerary={itinerary}
             destination={itinerary.destination || destination}
+            origin={origin.trim()}
+            originValue={originPlace?.value}
             startDate={startDate}
             endDate={endDate}
             onClose={() => setIsShareOpen(false)}
