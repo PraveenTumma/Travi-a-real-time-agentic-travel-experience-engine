@@ -326,3 +326,17 @@ Book bus, train and flight tickets for individuals or groups, in India and abroa
 - **API:** `GET /api/places/suggest?q=<text>&limit=8` returns `{places: [{label, name, region, country, country_code, lat, lng, value, kind}]}` (empty for queries under 2 characters; 90 requests/min per IP). `value` is a catalog code or a self-contained `geo:` token that `/api/booking/search` accepts as `origin`/`destination`, keeping option IDs stateless on serverless hosts.
 - **Prototype limits:** places outside the catalog are treated as cities (no airport matching); places closer than 30 km are rejected as too close to book.
 
+
+## Firebase setup checklist (project `travi-vibesprint`)
+
+Login and saved/shared trips need three things in the Firebase console. The code only holds the public web config (`frontend/src/firebase.js`, overridable with `VITE_FIREBASE_*`).
+
+1. **Authentication:** Build → Authentication → Get started → Sign-in method → enable **Google** (set a support email).
+2. **Authorized domains:** Authentication → Settings → Authorized domains → add the Vercel domain (e.g. `travi-ai.vercel.app`). Preview deployments need their own entries. `localhost` is there by default.
+3. **Firestore:** Build → Firestore Database → Create database (production mode), then publish the rules: `npx firebase-tools login && npx firebase-tools deploy --only firestore:rules` (uses `firebase.json`/`.firebaserc`), or paste `firestore.rules` into the console Rules tab.
+
+Quick checks from a terminal (public web API key from `firebase.js`):
+
+- Auth initialized? `curl "https://www.googleapis.com/identitytoolkit/v3/relyingparty/getProjectConfig?key=<apiKey>"` should list `authorizedDomains` (`CONFIGURATION_NOT_FOUND` means step 1 is missing).
+- Firestore exists? `curl "https://firestore.googleapis.com/v1/projects/travi-vibesprint/databases/(default)/documents/users?pageSize=1&key=<apiKey>"` should return 403 (exists, rules deny anonymous access). A 404 `database does not exist` means step 3 is missing.
+- Sign-in popup shows `auth/unauthorized-domain`? Step 2. `auth/configuration-not-found` or `operation-not-allowed`? Step 1.
