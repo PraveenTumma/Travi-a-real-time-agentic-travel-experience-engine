@@ -10,7 +10,11 @@ import os
 from pathlib import Path
 from contextlib import asynccontextmanager
 
+import truststore
 from dotenv import load_dotenv
+
+# Use the OS certificate store so outbound HTTPS works behind corporate TLS inspection
+truststore.inject_into_ssl()
 
 # Load .env before importing config
 load_dotenv()
@@ -23,6 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from config import settings
 from models import TripRequest, ReplanRequest, HealthResponse
 from services.orchestrator import TripOrchestrator
+from services.llm_service import call_anthropic_text
 from security import RateLimiter, sanitize_input, SecurityHeadersMiddleware
 
 # Configure logging
@@ -180,7 +185,7 @@ async def chat_with_trip(request: Request, body: dict):
 
     # Build context from itinerary
     context = f"DESTINATION: {destination}\n"
-    context += f"ITINERARY DATA:\n{json.dumps(itinerary_json, indent=2, default=str)[:6000]}\n"
+    context += f"ITINERARY DATA:\n{json.dumps(itinerary_json, indent=2, default=str)[:20000]}\n"
 
     system_prompt = f"""You are Travi, a friendly and knowledgeable AI travel assistant.
 You have access to the traveler's COMPLETE itinerary data below. Use it to answer questions.
@@ -207,20 +212,29 @@ RULES:
 
     messages.append({"role": "user", "content": user_message})
 
-    # Call Groq
     provider = settings.llm_provider
-    if provider == "groq":
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {settings.groq_api_key}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": "llama-3.3-70b-versatile",
-            "messages": messages,
-            "temperature": 0.7,
-            "max_tokens": 500,
-        }
+    if provider == "anthropic":
+        try:
+            # Anthropic takes the system prompt separately and only user/assistant turns
+            turns = [m for m in messages[1:] if m["role"] in ("user", "assistant") and m["content"]]
+            reply = await call_anthropic_text(system_prompt, turns, max_tokens=500, timeout=30.0)
+            return {"reply": reply}
+        except Exception as exc:
+            logger.error("Chat failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail="Chat failed. Please try again.")
+    # Groq disabled — Anthropic is the primary provider
+    # elif provider == "groq":
+    #     url = "https://api.groq.com/openai/v1/chat/completions"
+    #     headers = {
+    #         "Authorization": f"Bearer {settings.groq_api_key}",
+    #         "Content-Type": "application/json",
+    #     }
+    #     payload = {
+    #         "model": "llama-3.3-70b-versatile",
+    #         "messages": messages,
+    #         "temperature": 0.7,
+    #         "max_tokens": 500,
+    #     }
     elif provider == "gemini":
         url = f"https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
         headers = {
